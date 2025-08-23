@@ -4,13 +4,13 @@ import ThreadsTabs from '../components/ThreadsTabs.jsx';
 import StudyMaterials from '../components/StudyMaterials.jsx';
 import GoalCard from '../components/GoalCard.jsx';
 import { fetchDashboard, fetchGoals, fetchPlans } from '../services/api.js';
-import ThreadsTabs from '../components/ThreadsTabs.jsx';
 import PlanCard from '../components/PlanCard.jsx';
 
 export default function Dashboard() {
   const { userId } = useAppContext();
   const [summary, setSummary] = useState(null);
   const [plans, setPlans] = useState([]);
+  const [goals, setGoals] = useState([]);
 
   useEffect(() => {
     if (!userId) return;
@@ -27,7 +27,6 @@ export default function Dashboard() {
       <PlanCard plans={plans} />
       {summary && <p>Progress: {summary.progress}%</p>}
       <GoalCard />
-      <PlanCard />
       <StudyMaterials />
     </div>
   );
