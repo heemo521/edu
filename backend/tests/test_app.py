@@ -9,8 +9,8 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from ai_tutoring_mvp.backend.app.main import app
-from ai_tutoring_mvp.backend.app import database
+from backend.app.main import app
+from backend.app import database
 
 
 class APITestCase(unittest.TestCase):
@@ -49,10 +49,14 @@ class APITestCase(unittest.TestCase):
         reg = self.client.post('/register', json={'username': 'alice', 'password': 'wonder', 'role': 'student'})
         user_id = reg.json()['id']
         # Chat interactions
-        self.client.post('/chat', json={'user_id': user_id, 'message': 'What is 1+1?'})
-        self.client.post('/chat', json={'user_id': user_id, 'message': 'OK'})
+        self.client.post(
+            '/chat', json={'user_id': user_id, 'thread_id': 1, 'message': 'What is 1+1?'}
+        )
+        self.client.post(
+            '/chat', json={'user_id': user_id, 'thread_id': 1, 'message': 'OK'}
+        )
         # History
-        hist = self.client.get(f'/history/{user_id}')
+        hist = self.client.get(f'/history/{user_id}/1')
         self.assertEqual(hist.status_code, 200)
         history = hist.json()
         self.assertEqual(len(history), 2)
