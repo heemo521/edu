@@ -88,6 +88,7 @@ class Thread(ThreadBase):
         from_attributes = True
 
 
+
 # ------------------------ Topic and Goal Schemas ------------------------
 
 class TopicBase(BaseModel):
@@ -136,3 +137,55 @@ class Goal(GoalBase):
 class GoalTemplateRequest(BaseModel):
     """Request body for generating goals from a template."""
     user_id: int
+# ------------------------ Feedback Schemas ------------------------
+
+class FeedbackBase(BaseModel):
+    """Base fields for feedback on study materials."""
+    user_id: int
+    topic_id: int
+    rating: int
+    comments: str | None = None
+
+
+class FeedbackCreate(FeedbackBase):
+    """Model for submitting new feedback."""
+    pass
+
+
+class Feedback(FeedbackBase):
+    """Feedback entry returned in API responses."""
+    id: int
+
+    class Config:
+        from_attributes = True
+class Summary(BaseModel):
+    """Summarised text for a user's conversation thread."""
+    user_id: int
+    thread_id: int
+    summary: str
+# ------------------------ Plan Schemas ------------------------
+
+class PlanBase(BaseModel):
+    """Base fields for a study plan."""
+    user_id: int
+    goal_ids: list[int]
+    due_date: str | None = None
+    recurrence: str | None = None
+
+
+class PlanCreate(PlanBase):
+    """Model for creating a new study plan."""
+    pass
+
+
+class Plan(BaseModel):
+    """Study plan returned in API responses."""
+    id: int
+    user_id: int
+    goals: list[Goal]
+    due_date: str | None = None
+    recurrence: str | None = None
+    created_at: str
+
+    class Config:
+        from_attributes = True

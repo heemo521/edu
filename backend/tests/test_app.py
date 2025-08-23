@@ -48,6 +48,8 @@ class APITestCase(unittest.TestCase):
         # Setup user
         reg = self.client.post('/register', json={'username': 'alice', 'password': 'wonder', 'role': 'student'})
         user_id = reg.json()['id']
+        threads = self.client.get(f'/threads/{user_id}').json()
+        thread_id = threads[0]['id']
         # Chat interactions
         self.client.post(
             '/chat', json={'user_id': user_id, 'thread_id': 1, 'message': 'What is 1+1?'}
@@ -57,6 +59,10 @@ class APITestCase(unittest.TestCase):
         )
         # History
         hist = self.client.get(f'/history/{user_id}/1')
+        self.client.post('/chat', json={'user_id': user_id, 'thread_id': thread_id, 'message': 'What is 1+1?'})
+        self.client.post('/chat', json={'user_id': user_id, 'thread_id': thread_id, 'message': 'OK'})
+        # History
+        hist = self.client.get(f'/history/{user_id}/{thread_id}')
         self.assertEqual(hist.status_code, 200)
         history = hist.json()
         self.assertEqual(len(history), 2)
@@ -97,6 +103,22 @@ class APITestCase(unittest.TestCase):
         list_res = self.client.get(f'/goals/{user_id}')
         self.assertEqual(list_res.status_code, 200)
         self.assertEqual(len(list_res.json()), 2)
+    def test_summary_crud(self):
+        reg = self.client.post('/register', json={'username': 'sum', 'password': 'pass', 'role': 'student'})
+        user_id = reg.json()['id']
+        thread_id = self.client.get(f'/threads/{user_id}').json()[0]['id']
+        # Create summary
+        res = self.client.post('/summaries', json={'user_id': user_id, 'thread_id': thread_id, 'summary': 'hello'})
+        self.assertEqual(res.status_code, 201)
+        # Read summary
+        get_res = self.client.get(f'/summaries/{user_id}/{thread_id}')
+        self.assertEqual(get_res.status_code, 200)
+        self.assertEqual(get_res.json()['summary'], 'hello')
+        # Update summary
+        upd = self.client.put('/summaries', json={'user_id': user_id, 'thread_id': thread_id, 'summary': 'updated'})
+        self.assertEqual(upd.status_code, 200)
+        get_res2 = self.client.get(f'/summaries/{user_id}/{thread_id}')
+        self.assertEqual(get_res2.json()['summary'], 'updated')
 
 
 if __name__ == '__main__':

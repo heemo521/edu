@@ -223,6 +223,26 @@
             background-color: var(--header-bg-hover);
             color: var(--header-text);
         }
+
+        /* Simple modal styling */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: var(--bg-alt);
+            padding: 20px;
+            border-radius: 4px;
+            max-width: 400px;
+            width: 100%;
+        }
     </style>
 </head>
 <body>
@@ -314,6 +334,13 @@
                 <button onclick="createGoal()">Create Goal</button>
             </div>
 
+            <!-- Study plans section -->
+            <div id="plans-section" style="margin-top:15px;">
+                <h3>Study Plans</h3>
+                <button onclick="openPlanModal()">New Plan</button>
+                <div id="plans-list" style="margin-top:10px;"></div>
+            </div>
+
         <!-- Study materials section -->
         <div id="materials-section" style="margin-top:15px; display:none;">
             <h3>Study Materials</h3>
@@ -323,6 +350,26 @@
             <select id="material-category"></select>
             <div id="materials-content" style="margin-top:10px; border: 1px solid var(--border); padding:10px; border-radius:4px; background-color: var(--bg);"></div>
         </div>
+        </div>
+    </div>
+
+    <!-- Plan creation modal -->
+    <div id="plan-modal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <h3>Create Study Plan</h3>
+            <div id="plan-goals" style="max-height:150px; overflow-y:auto; margin-bottom:10px;"></div>
+            <label for="plan-due">Due Date:</label>
+            <input type="date" id="plan-due">
+            <label for="plan-recurrence">Recurrence:</label>
+            <select id="plan-recurrence">
+                <option value="daily">Daily</option>
+                <option value="weekly" selected>Weekly</option>
+                <option value="monthly">Monthly</option>
+            </select>
+            <div style="margin-top:10px; display:flex; gap:10px; justify-content:flex-end;">
+                <button onclick="submitPlan()">Save</button>
+                <button onclick="closePlanModal()">Cancel</button>
+            </div>
         </div>
     </div>
 

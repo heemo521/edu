@@ -37,6 +37,12 @@ except Exception:
     GOAL_TEMPLATES = {}
 
 
+# Maximum number of recent messages to include in the context before older
+# messages are summarised and stored. Once the message count exceeds this
+# threshold, earlier exchanges are condensed into a single summary string.
+MAX_CONTEXT_MESSAGES = 5
+
+
 # ---------------------- Context Builder ----------------------
 def build_context(user_id: int, thread_id: int, db: sqlite3.Connection) -> str:
     """Construct a context string for the tutoring agent.
@@ -73,32 +79,54 @@ def build_context(user_id: int, thread_id: int, db: sqlite3.Connection) -> str:
         goals_parts.append(f"{desc} ({completed}/{target} sessions)")
     goals_text = "; ".join(goals_parts) if goals_parts else "No active goals"
 
-    # Fetch the last five messages from this thread, sorted by newest first.
+    # Check for an existing stored summary for this thread
     cursor.execute(
-        "SELECT message, response FROM messages WHERE user_id = ? AND thread_id = ? ORDER BY timestamp DESC LIMIT 5",
+        "SELECT summary FROM summaries WHERE user_id = ? AND thread_id = ?",
         (user_id, thread_id),
     )
-    rows = cursor.fetchall()
-    # Determine total number of messages in this thread. This enables us to insert
-    # a summary line when older conversation exists beyond our limited context.
+    row = cursor.fetchone()
+    summary_text = row["summary"] if row else ""
+
+    # Fetch all messages in this thread in chronological order
     cursor.execute(
-        "SELECT COUNT(*) AS total_count FROM messages WHERE user_id = ? AND thread_id = ?",
+        "SELECT message, response FROM messages WHERE user_id = ? AND thread_id = ? ORDER BY timestamp ASC",
         (user_id, thread_id),
     )
-    count_row = cursor.fetchone()
-    total_count = count_row["total_count"] if count_row and count_row["total_count"] is not None else 0
-    # Reverse the limited rows to chronological order so the conversation flows naturally.
-    rows = list(reversed(rows))
+    all_rows = cursor.fetchall()
+    total_count = len(all_rows)
+
+    recent_rows = all_rows
+    if total_count > MAX_CONTEXT_MESSAGES:
+        # Separate older messages from the recent ones
+        summary_rows = all_rows[:-MAX_CONTEXT_MESSAGES]
+        recent_rows = all_rows[-MAX_CONTEXT_MESSAGES:]
+        if not summary_text:
+            # Create a naive summary by concatenating the older exchanges. In a
+            # production system, this would call an LLM to generate a concise
+            # summary instead.
+            summary_parts = [
+                f"Student: {r['message']} Tutor: {r['response']}" for r in summary_rows
+            ]
+            summary_text = " | ".join(summary_parts)
+            cursor.execute(
+                "INSERT OR REPLACE INTO summaries (user_id, thread_id, summary) VALUES (?, ?, ?)",
+                (user_id, thread_id, summary_text),
+            )
+            db.commit()
+    else:
+        # No summary needed; ensure any existing summary is cleared
+        if summary_text:
+            cursor.execute(
+                "DELETE FROM summaries WHERE user_id = ? AND thread_id = ?",
+                (user_id, thread_id),
+            )
+            db.commit()
+            summary_text = ""
+
     history_parts: list[str] = []
-    # If there are more messages than we've fetched, include a note about omitted
-    # messages. We can't summarise them automatically yet, but this warns the
-    # tutor (and the user) that earlier context exists.
-    if total_count > len(rows) and len(rows) > 0:
-        omitted = total_count - len(rows)
-        history_parts.append(
-            f"(Earlier conversation has {omitted} additional messages; older messages have been summarized.)"
-        )
-    for row in rows:
+    if summary_text:
+        history_parts.append(f"Summary: {summary_text}")
+    for row in recent_rows:
         msg = row["message"]
         resp = row["response"]
         history_parts.append(f"Student: {msg}\nTutor: {resp}")
@@ -610,6 +638,200 @@ def complete_goal(goal_id: int, db: sqlite3.Connection = Depends(database.get_db
         due_date=row["due_date"],
     )
 
+
+# ---------------------- Feedback Endpoints ----------------------
+
+@app.post("/feedback", response_model=schemas.Feedback, status_code=status.HTTP_201_CREATED)
+def create_feedback(feedback: schemas.FeedbackCreate, db: sqlite3.Connection = Depends(database.get_db)):
+    """Store user feedback for a topic."""
+    cursor = db.cursor()
+    # Validate that user and topic exist
+    cursor.execute("SELECT id FROM users WHERE id = ?", (feedback.user_id,))
+    if not cursor.fetchone():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    cursor.execute("SELECT id FROM topics WHERE id = ?", (feedback.topic_id,))
+    if not cursor.fetchone():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
+    cursor.execute(
+        "INSERT INTO feedback (user_id, topic_id, rating, comments) VALUES (?, ?, ?, ?)",
+        (feedback.user_id, feedback.topic_id, feedback.rating, feedback.comments),
+    )
+    db.commit()
+    feedback_id = cursor.lastrowid
+    cursor.execute(
+        "SELECT id, user_id, topic_id, rating, comments FROM feedback WHERE id = ?",
+        (feedback_id,),
+    )
+    row = cursor.fetchone()
+    return schemas.Feedback(
+        id=row["id"],
+        user_id=row["user_id"],
+        topic_id=row["topic_id"],
+        rating=row["rating"],
+        comments=row["comments"],
+    )
+
+
+@app.get("/feedback/{topic_id}", response_model=list[schemas.Feedback])
+def list_feedback(topic_id: int, db: sqlite3.Connection = Depends(database.get_db)):
+    """Return all feedback entries for a given topic."""
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id, user_id, topic_id, rating, comments FROM feedback WHERE topic_id = ? ORDER BY id ASC",
+        (topic_id,),
+    )
+    rows = cursor.fetchall()
+    feedback_list: list[schemas.Feedback] = []
+    for row in rows:
+        feedback_list.append(
+            schemas.Feedback(
+                id=row["id"],
+                user_id=row["user_id"],
+                topic_id=row["topic_id"],
+                rating=row["rating"],
+                comments=row["comments"],
+            )
+        )
+    return feedback_list
+
+# ---------------------- Summary Endpoints ----------------------
+
+@app.get("/summaries/{user_id}/{thread_id}", response_model=schemas.Summary)
+def get_summary(user_id: int, thread_id: int, db: sqlite3.Connection = Depends(database.get_db)):
+    """Retrieve the stored summary for a user's thread."""
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT summary FROM summaries WHERE user_id = ? AND thread_id = ?",
+        (user_id, thread_id),
+    )
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Summary not found")
+    return schemas.Summary(user_id=user_id, thread_id=thread_id, summary=row["summary"])
+
+
+@app.post("/summaries", response_model=schemas.Summary, status_code=status.HTTP_201_CREATED)
+def create_summary(summary: schemas.Summary, db: sqlite3.Connection = Depends(database.get_db)):
+    """Create or overwrite a summary for the specified thread."""
+    cursor = db.cursor()
+    cursor.execute(
+        "INSERT OR REPLACE INTO summaries (user_id, thread_id, summary) VALUES (?, ?, ?)",
+        (summary.user_id, summary.thread_id, summary.summary),
+    )
+    db.commit()
+    return summary
+
+
+@app.put("/summaries", response_model=schemas.Summary)
+def update_summary(summary: schemas.Summary, db: sqlite3.Connection = Depends(database.get_db)):
+    """Update an existing summary for a user's thread."""
+    cursor = db.cursor()
+    cursor.execute(
+        "UPDATE summaries SET summary = ? WHERE user_id = ? AND thread_id = ?",
+        (summary.summary, summary.user_id, summary.thread_id),
+    )
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Summary not found")
+    db.commit()
+    return summary
+# ---------------------- Plan Endpoints ----------------------
+
+@app.post("/plans", response_model=schemas.Plan, status_code=status.HTTP_201_CREATED)
+def create_plan(plan: schemas.PlanCreate, db: sqlite3.Connection = Depends(database.get_db)):
+    """Create a new study plan linking multiple goals for a user."""
+    cursor = db.cursor()
+    # Validate user exists
+    cursor.execute("SELECT id FROM users WHERE id = ?", (plan.user_id,))
+    if not cursor.fetchone():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    # Validate goals belong to user
+    if not plan.goal_ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No goals provided")
+    cursor.execute(
+        f"SELECT id FROM goals WHERE id IN ({','.join('?' for _ in plan.goal_ids)}) AND user_id = ?",
+        (*plan.goal_ids, plan.user_id),
+    )
+    rows = cursor.fetchall()
+    if len(rows) != len(plan.goal_ids):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid goal for user")
+    cursor.execute(
+        "INSERT INTO plans (user_id, due_date, recurrence) VALUES (?, ?, ?)",
+        (plan.user_id, plan.due_date, plan.recurrence),
+    )
+    db.commit()
+    plan_id = cursor.lastrowid
+    cursor.executemany(
+        "INSERT INTO plan_goals (plan_id, goal_id) VALUES (?, ?)",
+        [(plan_id, gid) for gid in plan.goal_ids],
+    )
+    db.commit()
+    return get_plan_by_id(plan_id, db)
+
+
+def get_plan_by_id(plan_id: int, db: sqlite3.Connection) -> schemas.Plan:
+    """Helper to fetch a plan with its goals."""
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id, user_id, due_date, recurrence, created_at FROM plans WHERE id = ?",
+        (plan_id,),
+    )
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
+    cursor.execute(
+        "SELECT g.id, g.user_id, g.topic_id, g.description, g.target_sessions, g.completed_sessions, g.created_at, g.due_date "
+        "FROM goals g JOIN plan_goals pg ON g.id = pg.goal_id WHERE pg.plan_id = ?",
+        (plan_id,),
+    )
+    goal_rows = cursor.fetchall()
+    goals = [
+        schemas.Goal(
+            id=gr["id"],
+            user_id=gr["user_id"],
+            topic_id=gr["topic_id"],
+            description=gr["description"],
+            target_sessions=gr["target_sessions"],
+            completed_sessions=gr["completed_sessions"],
+            created_at=gr["created_at"],
+            due_date=gr["due_date"],
+        )
+        for gr in goal_rows
+    ]
+    return schemas.Plan(
+        id=row["id"],
+        user_id=row["user_id"],
+        goals=goals,
+        due_date=row["due_date"],
+        recurrence=row["recurrence"],
+        created_at=row["created_at"],
+    )
+
+
+@app.get("/plans/{user_id}", response_model=list[schemas.Plan])
+def list_plans(user_id: int, db: sqlite3.Connection = Depends(database.get_db)):
+    """Return all study plans for a user."""
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id FROM plans WHERE user_id = ? ORDER BY created_at ASC",
+        (user_id,),
+    )
+    plan_ids = [row["id"] for row in cursor.fetchall()]
+    plans: list[schemas.Plan] = []
+    for pid in plan_ids:
+        plans.append(get_plan_by_id(pid, db))
+    return plans
+
+
+@app.delete("/plans/{plan_id}")
+def delete_plan(plan_id: int, db: sqlite3.Connection = Depends(database.get_db)):
+    """Delete a study plan and its links."""
+    cursor = db.cursor()
+    cursor.execute("DELETE FROM plan_goals WHERE plan_id = ?", (plan_id,))
+    cursor.execute("DELETE FROM plans WHERE id = ?", (plan_id,))
+    db.commit()
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
+    return {"status": "deleted"}
 
 # ---------------------- Thread Endpoints ----------------------
 

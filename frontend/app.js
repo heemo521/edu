@@ -21,6 +21,10 @@ let voiceEnabled = false;
 let ttsEnabled = false;
 let recognition = null;
 const apiBase = 'http://localhost:8000';
+// Mapping of topic names to IDs loaded from the backend. Used when submitting
+// feedback on study materials to associate ratings with a specific topic.
+const topicIdMap = {};
+let currentMaterialTopicId = null;
 
 // XP thresholds used to compute progress towards the next level. The index of the
 // threshold corresponds to the level number. For example, level 1 requires
@@ -168,11 +172,55 @@ async function loadMaterials() {
                 });
             });
             contentEl.innerHTML = html;
+
+            // Determine the topic ID based on the material title so feedback can
+            // be associated with the correct topic.
+            currentMaterialTopicId = null;
+            if (data.title && topicIdMap[data.title]) {
+                currentMaterialTopicId = topicIdMap[data.title];
+            }
+
+            // Append feedback widget if user is logged in and topic ID known
+            if (currentUserId && currentMaterialTopicId) {
+                const widget = document.createElement('div');
+                widget.id = 'feedback-widget';
+                widget.innerHTML = `\n                    <h4>Rate this material</h4>\n                    <label>Rating:\n                        <select id="feedback-rating">\n                            <option value="1">1</option>\n                            <option value="2">2</option>\n                            <option value="3">3</option>\n                            <option value="4">4</option>\n                            <option value="5" selected>5</option>\n                        </select>\n                    </label>\n                    <label>Comments:\n                        <input type="text" id="feedback-comments">\n                    </label>\n                    <button onclick="submitFeedback()">Submit Feedback</button>\n                `;
+                contentEl.appendChild(widget);
+            }
         } else {
             contentEl.textContent = 'No materials found.';
         }
     } catch (err) {
         contentEl.textContent = 'Error loading materials';
+    }
+}
+
+/**
+ * Submit user feedback for the currently viewed material.
+ */
+async function submitFeedback() {
+    if (!currentUserId || !currentMaterialTopicId) return;
+    const ratingEl = document.getElementById('feedback-rating');
+    const commentsEl = document.getElementById('feedback-comments');
+    if (!ratingEl) return;
+    const rating = parseInt(ratingEl.value, 10);
+    const comments = commentsEl ? commentsEl.value : '';
+    try {
+        const res = await fetch(`${apiBase}/feedback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: currentUserId, topic_id: currentMaterialTopicId, rating, comments })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showNotification('Feedback submitted!', 'success');
+            ratingEl.value = '5';
+            if (commentsEl) commentsEl.value = '';
+        } else {
+            showNotification(data.detail || 'Failed to submit feedback', 'error');
+        }
+    } catch (err) {
+        showNotification('Error connecting to server', 'error');
     }
 }
 
@@ -350,7 +398,10 @@ async function loadTopics() {
             if (select) {
                 // Clear existing options
                 select.innerHTML = '';
+                // Reset local topic cache and populate select options
+                Object.keys(topicIdMap).forEach((key) => delete topicIdMap[key]);
                 data.forEach((topic) => {
+                    topicIdMap[topic.name] = topic.id;
                     const option = document.createElement('option');
                     option.value = topic.id;
                     option.textContent = topic.name;
@@ -472,6 +523,124 @@ async function completeGoal(goalId) {
         const data = await res.json();
         if (!res.ok) {
             showNotification(data.detail || 'Failed to complete goal session', 'error');
+        }
+    } catch (err) {
+        showNotification('Error connecting to server', 'error');
+    }
+}
+
+// -------------------------- Plans --------------------------
+
+/** Open the plan creation modal and populate goal checkboxes. */
+async function openPlanModal() {
+    if (!currentUserId) return;
+    const modal = document.getElementById('plan-modal');
+    const goalsDiv = document.getElementById('plan-goals');
+    if (!modal || !goalsDiv) return;
+    goalsDiv.textContent = 'Loading...';
+    modal.style.display = 'flex';
+    try {
+        const res = await fetch(`${apiBase}/goals/${currentUserId}`);
+        const data = await res.json();
+        if (res.ok) {
+            goalsDiv.innerHTML = '';
+            data.forEach((goal) => {
+                const label = document.createElement('label');
+                label.style.display = 'block';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = goal.id;
+                label.appendChild(cb);
+                label.append(` ${goal.description || 'Goal'} (${goal.completed_sessions}/${goal.target_sessions})`);
+                goalsDiv.appendChild(label);
+            });
+        } else {
+            goalsDiv.innerHTML = `<p>${data.detail || 'Failed to load goals'}</p>`;
+        }
+    } catch (err) {
+        goalsDiv.textContent = 'Error loading goals';
+    }
+}
+
+function closePlanModal() {
+    const modal = document.getElementById('plan-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+/** Submit the plan creation form. */
+async function submitPlan() {
+    const goalsDiv = document.getElementById('plan-goals');
+    const dueEl = document.getElementById('plan-due');
+    const recEl = document.getElementById('plan-recurrence');
+    const goalIds = Array.from(goalsDiv.querySelectorAll('input[type="checkbox"]:checked')).map((cb) => parseInt(cb.value));
+    try {
+        const res = await fetch(`${apiBase}/plans`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: currentUserId,
+                goal_ids: goalIds,
+                due_date: dueEl.value || null,
+                recurrence: recEl.value || null
+            })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showNotification('Plan created successfully!', 'success');
+            closePlanModal();
+            loadPlans();
+        } else {
+            showNotification(data.detail || 'Failed to create plan', 'error');
+        }
+    } catch (err) {
+        showNotification('Error connecting to server', 'error');
+    }
+}
+
+/** Load and display plans for the current user. */
+async function loadPlans() {
+    if (!currentUserId) return;
+    const plansList = document.getElementById('plans-list');
+    if (!plansList) return;
+    plansList.textContent = 'Loading...';
+    try {
+        const res = await fetch(`${apiBase}/plans/${currentUserId}`);
+        const data = await res.json();
+        if (res.ok) {
+            plansList.innerHTML = '';
+            if (data.length === 0) {
+                plansList.innerHTML = '<p>No plans created.</p>';
+            } else {
+                data.forEach((plan) => {
+                    const div = document.createElement('div');
+                    const goalsText = plan.goals.map((g) => g.description || 'Goal').join(', ');
+                    const due = plan.due_date ? ` (due ${plan.due_date})` : '';
+                    const rec = plan.recurrence ? ` [${plan.recurrence}]` : '';
+                    div.innerHTML = `<strong>${goalsText}</strong>${due}${rec}`;
+                    const del = document.createElement('button');
+                    del.textContent = 'Delete';
+                    del.onclick = async () => { await deletePlan(plan.id); };
+                    div.appendChild(del);
+                    plansList.appendChild(div);
+                });
+            }
+        } else {
+            plansList.innerHTML = `<p>${data.detail || 'Failed to load plans'}</p>`;
+        }
+    } catch (err) {
+        plansList.textContent = 'Error connecting to server';
+    }
+}
+
+/** Delete a plan by ID and reload plans. */
+async function deletePlan(planId) {
+    try {
+        const res = await fetch(`${apiBase}/plans/${planId}`, { method: 'DELETE' });
+        if (res.ok) {
+            loadPlans();
+        } else {
+            const data = await res.json();
+            showNotification(data.detail || 'Failed to delete plan', 'error');
         }
     } catch (err) {
         showNotification('Error connecting to server', 'error');
@@ -621,6 +790,9 @@ function signOut() {
     document.getElementById('chat-messages').innerHTML = '';
     document.getElementById('history').innerHTML = '';
     document.getElementById('summary').innerHTML = '';
+    const plansList = document.getElementById('plans-list');
+    if (plansList) plansList.innerHTML = '';
+    closePlanModal();
     clearUserInfo();
     showNotification('Signed out successfully', 'success');
 }
@@ -704,11 +876,12 @@ async function login() {
             // After loading threads, currentThreadId should be set; load history and dashboard.
             // Load history only if a thread was loaded
             if (currentThreadId) {
-                await loadHistory();
+            await loadHistory();
             }
             // Load topics and goals for the user after login
             loadTopics();
             loadGoals();
+            loadPlans();
             // Load study materials subjects and show the materials section
             const materialsSection = document.getElementById('materials-section');
             if (materialsSection) {
