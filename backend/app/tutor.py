@@ -19,12 +19,13 @@ OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 # environment variable (e.g. "llama3", "llama2", "mistral").
 LLAMA_MODEL = os.environ.get("LLAMA_MODEL", "llama3")
 
-# System prompt used to steer the language model toward effective tutoring behavior.
-# The prompt instructs the model to act as a Socratic tutor: ask clarifying questions,
-# provide hints rather than direct answers, adapt to different subjects, and solicit
-# feedback to improve the interaction.  Adjust this prompt to refine the tutor's
-# tone and strategy.
-SYSTEM_PROMPT = (
+# Path to the system prompt file. Users can override this via the
+# SYSTEM_PROMPT_PATH environment variable. The default points to the prompt
+# copied into the container image.
+SYSTEM_PROMPT_PATH = os.environ.get("SYSTEM_PROMPT_PATH", "/app/prompt.txt")
+
+# Default system prompt text used if the configuration file cannot be read.
+DEFAULT_SYSTEM_PROMPT = (
     "You are a helpful AI tutoring assistant. Your role is to guide students through learning "
     "topics by asking questions and helping them reason step by step rather than giving direct "
     "answers. When answering, first identify the subject (e.g., Algebra, Biology, Programming) "
@@ -33,6 +34,31 @@ SYSTEM_PROMPT = (
     "ask the student if the explanation was helpful and request feedback or a brief summary in "
     "their own words. This will help improve future lessons."
 )
+
+
+def _load_system_prompt(path: str) -> str:
+    """Load the system prompt from a text file.
+
+    Args:
+        path: Filesystem path to the prompt file.
+
+    Returns:
+        The contents of the prompt file if it exists, otherwise a default
+        instructional prompt.
+    """
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return fh.read().strip()
+    except OSError:
+        return DEFAULT_SYSTEM_PROMPT
+
+
+# System prompt used to steer the language model toward effective tutoring behavior.
+# The prompt instructs the model to act as a Socratic tutor: ask clarifying questions,
+# provide hints rather than direct answers, adapt to different subjects, and solicit
+# feedback to improve the interaction. Adjust this prompt to refine the tutor's tone
+# and strategy.
+SYSTEM_PROMPT = _load_system_prompt(SYSTEM_PROMPT_PATH)
 
 
 def _call_ollama(prompt: str) -> str:
