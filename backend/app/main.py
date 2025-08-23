@@ -527,6 +527,106 @@ def complete_goal(goal_id: int, db: sqlite3.Connection = Depends(database.get_db
     )
 
 
+# ---------------------- Plan Endpoints ----------------------
+
+@app.post("/plans", response_model=schemas.Plan, status_code=status.HTTP_201_CREATED)
+def create_plan(plan: schemas.PlanCreate, db: sqlite3.Connection = Depends(database.get_db)):
+    """Create a new study plan linking multiple goals for a user."""
+    cursor = db.cursor()
+    # Validate user exists
+    cursor.execute("SELECT id FROM users WHERE id = ?", (plan.user_id,))
+    if not cursor.fetchone():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    # Validate goals belong to user
+    if not plan.goal_ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No goals provided")
+    cursor.execute(
+        f"SELECT id FROM goals WHERE id IN ({','.join('?' for _ in plan.goal_ids)}) AND user_id = ?",
+        (*plan.goal_ids, plan.user_id),
+    )
+    rows = cursor.fetchall()
+    if len(rows) != len(plan.goal_ids):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid goal for user")
+    cursor.execute(
+        "INSERT INTO plans (user_id, due_date, recurrence) VALUES (?, ?, ?)",
+        (plan.user_id, plan.due_date, plan.recurrence),
+    )
+    db.commit()
+    plan_id = cursor.lastrowid
+    cursor.executemany(
+        "INSERT INTO plan_goals (plan_id, goal_id) VALUES (?, ?)",
+        [(plan_id, gid) for gid in plan.goal_ids],
+    )
+    db.commit()
+    return get_plan_by_id(plan_id, db)
+
+
+def get_plan_by_id(plan_id: int, db: sqlite3.Connection) -> schemas.Plan:
+    """Helper to fetch a plan with its goals."""
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id, user_id, due_date, recurrence, created_at FROM plans WHERE id = ?",
+        (plan_id,),
+    )
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
+    cursor.execute(
+        "SELECT g.id, g.user_id, g.topic_id, g.description, g.target_sessions, g.completed_sessions, g.created_at, g.due_date "
+        "FROM goals g JOIN plan_goals pg ON g.id = pg.goal_id WHERE pg.plan_id = ?",
+        (plan_id,),
+    )
+    goal_rows = cursor.fetchall()
+    goals = [
+        schemas.Goal(
+            id=gr["id"],
+            user_id=gr["user_id"],
+            topic_id=gr["topic_id"],
+            description=gr["description"],
+            target_sessions=gr["target_sessions"],
+            completed_sessions=gr["completed_sessions"],
+            created_at=gr["created_at"],
+            due_date=gr["due_date"],
+        )
+        for gr in goal_rows
+    ]
+    return schemas.Plan(
+        id=row["id"],
+        user_id=row["user_id"],
+        goals=goals,
+        due_date=row["due_date"],
+        recurrence=row["recurrence"],
+        created_at=row["created_at"],
+    )
+
+
+@app.get("/plans/{user_id}", response_model=list[schemas.Plan])
+def list_plans(user_id: int, db: sqlite3.Connection = Depends(database.get_db)):
+    """Return all study plans for a user."""
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id FROM plans WHERE user_id = ? ORDER BY created_at ASC",
+        (user_id,),
+    )
+    plan_ids = [row["id"] for row in cursor.fetchall()]
+    plans: list[schemas.Plan] = []
+    for pid in plan_ids:
+        plans.append(get_plan_by_id(pid, db))
+    return plans
+
+
+@app.delete("/plans/{plan_id}")
+def delete_plan(plan_id: int, db: sqlite3.Connection = Depends(database.get_db)):
+    """Delete a study plan and its links."""
+    cursor = db.cursor()
+    cursor.execute("DELETE FROM plan_goals WHERE plan_id = ?", (plan_id,))
+    cursor.execute("DELETE FROM plans WHERE id = ?", (plan_id,))
+    db.commit()
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plan not found")
+    return {"status": "deleted"}
+
+
 # ---------------------- Thread Endpoints ----------------------
 
 @app.get("/threads/{user_id}", response_model=list[schemas.Thread])

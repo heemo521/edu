@@ -108,6 +108,35 @@ def init_db() -> None:
             )
             """
         )
+
+        # Create table for study plans. A plan groups multiple goals for a user
+        # and includes scheduling information such as due dates and recurring
+        # cadence (e.g. weekly).
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS plans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                due_date TEXT,
+                recurrence TEXT,
+                created_at TEXT DEFAULT (DATETIME('now')),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+
+        # Linking table between plans and goals. Each plan can reference
+        # multiple goals and a goal can belong to multiple plans if desired.
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS plan_goals (
+                plan_id INTEGER NOT NULL,
+                goal_id INTEGER NOT NULL,
+                FOREIGN KEY (plan_id) REFERENCES plans(id),
+                FOREIGN KEY (goal_id) REFERENCES goals(id)
+            )
+            """
+        )
         # Ensure progress-related columns exist in users table
         # xp: cumulative experience points
         # level: integer level derived from xp
