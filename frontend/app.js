@@ -21,6 +21,10 @@ let voiceEnabled = false;
 let ttsEnabled = false;
 let recognition = null;
 const apiBase = 'http://localhost:8000';
+// Mapping of topic names to IDs loaded from the backend. Used when submitting
+// feedback on study materials to associate ratings with a specific topic.
+const topicIdMap = {};
+let currentMaterialTopicId = null;
 
 // XP thresholds used to compute progress towards the next level. The index of the
 // threshold corresponds to the level number. For example, level 1 requires
@@ -168,11 +172,55 @@ async function loadMaterials() {
                 });
             });
             contentEl.innerHTML = html;
+
+            // Determine the topic ID based on the material title so feedback can
+            // be associated with the correct topic.
+            currentMaterialTopicId = null;
+            if (data.title && topicIdMap[data.title]) {
+                currentMaterialTopicId = topicIdMap[data.title];
+            }
+
+            // Append feedback widget if user is logged in and topic ID known
+            if (currentUserId && currentMaterialTopicId) {
+                const widget = document.createElement('div');
+                widget.id = 'feedback-widget';
+                widget.innerHTML = `\n                    <h4>Rate this material</h4>\n                    <label>Rating:\n                        <select id="feedback-rating">\n                            <option value="1">1</option>\n                            <option value="2">2</option>\n                            <option value="3">3</option>\n                            <option value="4">4</option>\n                            <option value="5" selected>5</option>\n                        </select>\n                    </label>\n                    <label>Comments:\n                        <input type="text" id="feedback-comments">\n                    </label>\n                    <button onclick="submitFeedback()">Submit Feedback</button>\n                `;
+                contentEl.appendChild(widget);
+            }
         } else {
             contentEl.textContent = 'No materials found.';
         }
     } catch (err) {
         contentEl.textContent = 'Error loading materials';
+    }
+}
+
+/**
+ * Submit user feedback for the currently viewed material.
+ */
+async function submitFeedback() {
+    if (!currentUserId || !currentMaterialTopicId) return;
+    const ratingEl = document.getElementById('feedback-rating');
+    const commentsEl = document.getElementById('feedback-comments');
+    if (!ratingEl) return;
+    const rating = parseInt(ratingEl.value, 10);
+    const comments = commentsEl ? commentsEl.value : '';
+    try {
+        const res = await fetch(`${apiBase}/feedback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: currentUserId, topic_id: currentMaterialTopicId, rating, comments })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showNotification('Feedback submitted!', 'success');
+            ratingEl.value = '5';
+            if (commentsEl) commentsEl.value = '';
+        } else {
+            showNotification(data.detail || 'Failed to submit feedback', 'error');
+        }
+    } catch (err) {
+        showNotification('Error connecting to server', 'error');
     }
 }
 
@@ -350,7 +398,10 @@ async function loadTopics() {
             if (select) {
                 // Clear existing options
                 select.innerHTML = '';
+                // Reset local topic cache and populate select options
+                Object.keys(topicIdMap).forEach((key) => delete topicIdMap[key]);
                 data.forEach((topic) => {
+                    topicIdMap[topic.name] = topic.id;
                     const option = document.createElement('option');
                     option.value = topic.id;
                     option.textContent = topic.name;

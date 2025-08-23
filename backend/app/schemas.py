@@ -131,3 +131,26 @@ class Goal(GoalBase):
 
     class Config:
         from_attributes = True
+
+
+# ------------------------ Feedback Schemas ------------------------
+
+class FeedbackBase(BaseModel):
+    """Base fields for feedback on study materials."""
+    user_id: int
+    topic_id: int
+    rating: int
+    comments: str | None = None
+
+
+class FeedbackCreate(FeedbackBase):
+    """Model for submitting new feedback."""
+    pass
+
+
+class Feedback(FeedbackBase):
+    """Feedback entry returned in API responses."""
+    id: int
+
+    class Config:
+        from_attributes = True
