@@ -64,6 +64,23 @@ def init_db() -> None:
             )
             """
         )
+
+        # Summaries table stores condensed representations of long conversation
+        # threads.  Each entry is uniquely identified by the owning user and
+        # thread.  The summary text may be regenerated over time as more
+        # messages are added.
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS summaries (
+                user_id INTEGER NOT NULL,
+                thread_id INTEGER NOT NULL,
+                summary TEXT,
+                PRIMARY KEY (user_id, thread_id),
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (thread_id) REFERENCES threads(id)
+            )
+            """
+        )
         # Create table for subscriptions
         cursor.execute(
             """
@@ -122,6 +139,31 @@ def init_db() -> None:
                 comments TEXT,
                 FOREIGN KEY (user_id) REFERENCES users(id),
                 FOREIGN KEY (topic_id) REFERENCES topics(id)
+        # Create table for study plans. A plan groups multiple goals for a user
+        # and includes scheduling information such as due dates and recurring
+        # cadence (e.g. weekly).
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS plans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                due_date TEXT,
+                recurrence TEXT,
+                created_at TEXT DEFAULT (DATETIME('now')),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+
+        # Linking table between plans and goals. Each plan can reference
+        # multiple goals and a goal can belong to multiple plans if desired.
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS plan_goals (
+                plan_id INTEGER NOT NULL,
+                goal_id INTEGER NOT NULL,
+                FOREIGN KEY (plan_id) REFERENCES plans(id),
+                FOREIGN KEY (goal_id) REFERENCES goals(id)
             )
             """
         )

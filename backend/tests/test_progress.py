@@ -11,8 +11,8 @@ import sqlite3
 
 from fastapi.testclient import TestClient
 
-from ai_tutoring_mvp.backend.app.main import app
-from ai_tutoring_mvp.backend.app import database, progress
+from backend.app.main import app
+from backend.app import database, progress
 
 
 class ProgressTestCase(unittest.TestCase):
@@ -33,17 +33,18 @@ class ProgressTestCase(unittest.TestCase):
         # Register a new user
         res = self.client.post('/register', json={'username': 'lev', 'password': '1234', 'role': 'student'})
         user_id = res.json()['id']
+        thread_id = self.client.get(f'/threads/{user_id}').json()[0]['id']
         # Each chat grants default 10 XP. After 15 chats, XP should be 150.
         # According to XP_THRESHOLDS [0,100,250,...], 150 XP corresponds to level 1.
         for _ in range(15):
-            self.client.post('/chat', json={'user_id': user_id, 'message': 'dummy'})
+            self.client.post('/chat', json={'user_id': user_id, 'thread_id': thread_id, 'message': 'dummy'})
         # Fetch dashboard to verify XP and level
         dash = self.client.get(f'/dashboard/{user_id}').json()
         self.assertGreaterEqual(dash['xp'], 150)
         self.assertEqual(dash['level'], 1)
         # A few more chats to cross the next threshold (250 XP -> level 2)
         for _ in range(15):
-            self.client.post('/chat', json={'user_id': user_id, 'message': 'dummy2'})
+            self.client.post('/chat', json={'user_id': user_id, 'thread_id': thread_id, 'message': 'dummy2'})
         dash2 = self.client.get(f'/dashboard/{user_id}').json()
         # After 30 chats total, XP >= 300, level should be >= 2
         self.assertGreaterEqual(dash2['xp'], 300)

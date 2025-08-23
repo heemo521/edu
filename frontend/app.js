@@ -529,6 +529,124 @@ async function completeGoal(goalId) {
     }
 }
 
+// -------------------------- Plans --------------------------
+
+/** Open the plan creation modal and populate goal checkboxes. */
+async function openPlanModal() {
+    if (!currentUserId) return;
+    const modal = document.getElementById('plan-modal');
+    const goalsDiv = document.getElementById('plan-goals');
+    if (!modal || !goalsDiv) return;
+    goalsDiv.textContent = 'Loading...';
+    modal.style.display = 'flex';
+    try {
+        const res = await fetch(`${apiBase}/goals/${currentUserId}`);
+        const data = await res.json();
+        if (res.ok) {
+            goalsDiv.innerHTML = '';
+            data.forEach((goal) => {
+                const label = document.createElement('label');
+                label.style.display = 'block';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = goal.id;
+                label.appendChild(cb);
+                label.append(` ${goal.description || 'Goal'} (${goal.completed_sessions}/${goal.target_sessions})`);
+                goalsDiv.appendChild(label);
+            });
+        } else {
+            goalsDiv.innerHTML = `<p>${data.detail || 'Failed to load goals'}</p>`;
+        }
+    } catch (err) {
+        goalsDiv.textContent = 'Error loading goals';
+    }
+}
+
+function closePlanModal() {
+    const modal = document.getElementById('plan-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+/** Submit the plan creation form. */
+async function submitPlan() {
+    const goalsDiv = document.getElementById('plan-goals');
+    const dueEl = document.getElementById('plan-due');
+    const recEl = document.getElementById('plan-recurrence');
+    const goalIds = Array.from(goalsDiv.querySelectorAll('input[type="checkbox"]:checked')).map((cb) => parseInt(cb.value));
+    try {
+        const res = await fetch(`${apiBase}/plans`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: currentUserId,
+                goal_ids: goalIds,
+                due_date: dueEl.value || null,
+                recurrence: recEl.value || null
+            })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showNotification('Plan created successfully!', 'success');
+            closePlanModal();
+            loadPlans();
+        } else {
+            showNotification(data.detail || 'Failed to create plan', 'error');
+        }
+    } catch (err) {
+        showNotification('Error connecting to server', 'error');
+    }
+}
+
+/** Load and display plans for the current user. */
+async function loadPlans() {
+    if (!currentUserId) return;
+    const plansList = document.getElementById('plans-list');
+    if (!plansList) return;
+    plansList.textContent = 'Loading...';
+    try {
+        const res = await fetch(`${apiBase}/plans/${currentUserId}`);
+        const data = await res.json();
+        if (res.ok) {
+            plansList.innerHTML = '';
+            if (data.length === 0) {
+                plansList.innerHTML = '<p>No plans created.</p>';
+            } else {
+                data.forEach((plan) => {
+                    const div = document.createElement('div');
+                    const goalsText = plan.goals.map((g) => g.description || 'Goal').join(', ');
+                    const due = plan.due_date ? ` (due ${plan.due_date})` : '';
+                    const rec = plan.recurrence ? ` [${plan.recurrence}]` : '';
+                    div.innerHTML = `<strong>${goalsText}</strong>${due}${rec}`;
+                    const del = document.createElement('button');
+                    del.textContent = 'Delete';
+                    del.onclick = async () => { await deletePlan(plan.id); };
+                    div.appendChild(del);
+                    plansList.appendChild(div);
+                });
+            }
+        } else {
+            plansList.innerHTML = `<p>${data.detail || 'Failed to load plans'}</p>`;
+        }
+    } catch (err) {
+        plansList.textContent = 'Error connecting to server';
+    }
+}
+
+/** Delete a plan by ID and reload plans. */
+async function deletePlan(planId) {
+    try {
+        const res = await fetch(`${apiBase}/plans/${planId}`, { method: 'DELETE' });
+        if (res.ok) {
+            loadPlans();
+        } else {
+            const data = await res.json();
+            showNotification(data.detail || 'Failed to delete plan', 'error');
+        }
+    } catch (err) {
+        showNotification('Error connecting to server', 'error');
+    }
+}
+
 // Show notifications (success or error) in a unified manner
 function showNotification(message, type = 'success') {
     const notif = document.getElementById('notification');
@@ -672,6 +790,9 @@ function signOut() {
     document.getElementById('chat-messages').innerHTML = '';
     document.getElementById('history').innerHTML = '';
     document.getElementById('summary').innerHTML = '';
+    const plansList = document.getElementById('plans-list');
+    if (plansList) plansList.innerHTML = '';
+    closePlanModal();
     clearUserInfo();
     showNotification('Signed out successfully', 'success');
 }
@@ -755,11 +876,12 @@ async function login() {
             // After loading threads, currentThreadId should be set; load history and dashboard.
             // Load history only if a thread was loaded
             if (currentThreadId) {
-                await loadHistory();
+            await loadHistory();
             }
             // Load topics and goals for the user after login
             loadTopics();
             loadGoals();
+            loadPlans();
             // Load study materials subjects and show the materials section
             const materialsSection = document.getElementById('materials-section');
             if (materialsSection) {

@@ -9,8 +9,8 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from ai_tutoring_mvp.backend.app.main import app
-from ai_tutoring_mvp.backend.app import database
+from backend.app.main import app
+from backend.app import database
 
 
 class APITestCase(unittest.TestCase):
@@ -48,11 +48,13 @@ class APITestCase(unittest.TestCase):
         # Setup user
         reg = self.client.post('/register', json={'username': 'alice', 'password': 'wonder', 'role': 'student'})
         user_id = reg.json()['id']
+        threads = self.client.get(f'/threads/{user_id}').json()
+        thread_id = threads[0]['id']
         # Chat interactions
-        self.client.post('/chat', json={'user_id': user_id, 'message': 'What is 1+1?'})
-        self.client.post('/chat', json={'user_id': user_id, 'message': 'OK'})
+        self.client.post('/chat', json={'user_id': user_id, 'thread_id': thread_id, 'message': 'What is 1+1?'})
+        self.client.post('/chat', json={'user_id': user_id, 'thread_id': thread_id, 'message': 'OK'})
         # History
-        hist = self.client.get(f'/history/{user_id}')
+        hist = self.client.get(f'/history/{user_id}/{thread_id}')
         self.assertEqual(hist.status_code, 200)
         history = hist.json()
         self.assertEqual(len(history), 2)
@@ -77,6 +79,23 @@ class APITestCase(unittest.TestCase):
         cancel = self.client.post('/subscribe', json={'user_id': user_id, 'action': 'cancel'})
         self.assertEqual(cancel.status_code, 200)
         self.assertEqual(cancel.json()['status'], 'inactive')
+
+    def test_summary_crud(self):
+        reg = self.client.post('/register', json={'username': 'sum', 'password': 'pass', 'role': 'student'})
+        user_id = reg.json()['id']
+        thread_id = self.client.get(f'/threads/{user_id}').json()[0]['id']
+        # Create summary
+        res = self.client.post('/summaries', json={'user_id': user_id, 'thread_id': thread_id, 'summary': 'hello'})
+        self.assertEqual(res.status_code, 201)
+        # Read summary
+        get_res = self.client.get(f'/summaries/{user_id}/{thread_id}')
+        self.assertEqual(get_res.status_code, 200)
+        self.assertEqual(get_res.json()['summary'], 'hello')
+        # Update summary
+        upd = self.client.put('/summaries', json={'user_id': user_id, 'thread_id': thread_id, 'summary': 'updated'})
+        self.assertEqual(upd.status_code, 200)
+        get_res2 = self.client.get(f'/summaries/{user_id}/{thread_id}')
+        self.assertEqual(get_res2.json()['summary'], 'updated')
 
 
 if __name__ == '__main__':
