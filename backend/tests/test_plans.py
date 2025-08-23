@@ -1,8 +1,8 @@
 import os
 import unittest
 from fastapi.testclient import TestClient
-from ai_tutoring_mvp.backend.app.main import app
-from ai_tutoring_mvp.backend.app import database
+from backend.app.main import app
+from backend.app import database
 
 class PlanTestCase(unittest.TestCase):
     def setUp(self):
@@ -30,10 +30,18 @@ class PlanTestCase(unittest.TestCase):
         g1_id = g1.json()['id']
         g2_id = g2.json()['id']
         # create plan
-        plan_res = self.client.post('/plans', json={'user_id':user_id,'goal_ids':[g1_id,g2_id],'due_date':'2025-01-01','recurrence':'weekly'})
-        self.assertEqual(plan_res.status_code,201)
+        plan_res = self.client.post(
+            '/plans',
+            json={
+                'user_id': user_id,
+                'goal_ids': [g1_id, g2_id],
+                'due_date': '2025-01-01',
+                'recurrence': 'weekly'
+            }
+        )
+        self.assertEqual(plan_res.status_code, 201)
         plan = plan_res.json()
-        self.assertEqual(len(plan['goals']),2)
+        self.assertEqual(len(plan['goals']), 2)
         plan_id = plan['id']
         # get plans
         plans_list = self.client.get(f'/plans/{user_id}')

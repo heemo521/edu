@@ -25,6 +25,17 @@ except Exception:
     # propagation should be implemented.
     STUDY_MATERIALS = {}
 
+# ---------------------- Goal Templates Loading ----------------------
+_goal_templates_path = os.path.join(BASE_DIR, "data", "goal_templates.json")
+try:
+    with open(_goal_templates_path, "r", encoding="utf-8") as f:
+        GOAL_TEMPLATES: dict[str, list[dict]] = json.load(f)
+except Exception:
+    # If templates cannot be loaded, default to an empty dictionary so the
+    # application still functions. Endpoints depending on templates will
+    # return a 404 when accessed.
+    GOAL_TEMPLATES = {}
+
 
 # Maximum number of recent messages to include in the context before older
 # messages are summarised and stored. Once the message count exceeds this
@@ -122,6 +133,65 @@ def build_context(user_id: int, thread_id: int, db: sqlite3.Connection) -> str:
     history_text = "\n".join(history_parts) if history_parts else "No recent history"
 
     return f"User goals: {goals_text}\nRecent history:\n{history_text}"
+
+
+def create_goals_from_template(user_id: int, subject: str, db: sqlite3.Connection) -> list[schemas.Goal]:
+    """Create a set of goals for a user from a subject template.
+
+    Args:
+        user_id: The ID of the user who will own the goals.
+        subject: Key for the template group in ``GOAL_TEMPLATES``.
+        db: Database connection.
+
+    Returns:
+        A list of newly created ``schemas.Goal`` instances.
+
+    Raises:
+        HTTPException: If no templates exist for the requested subject.
+    """
+
+    template = GOAL_TEMPLATES.get(subject)
+    if not template:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No templates for subject")
+
+    cursor = db.cursor()
+    created: list[schemas.Goal] = []
+    for item in template:
+        topic_name = item.get("topic")
+        desc = item.get("description")
+        target = item.get("target_sessions", 1)
+
+        # Find topic ID; skip if topic not found in DB
+        cursor.execute("SELECT id FROM topics WHERE name = ?", (topic_name,))
+        topic_row = cursor.fetchone()
+        if not topic_row:
+            continue
+
+        cursor.execute(
+            "INSERT INTO goals (user_id, topic_id, description, target_sessions, completed_sessions) VALUES (?, ?, ?, ?, 0)",
+            (user_id, topic_row["id"], desc, target),
+        )
+        goal_id = cursor.lastrowid
+        cursor.execute(
+            "SELECT id, user_id, topic_id, description, target_sessions, completed_sessions, created_at, due_date FROM goals WHERE id = ?",
+            (goal_id,),
+        )
+        row = cursor.fetchone()
+        created.append(
+            schemas.Goal(
+                id=row["id"],
+                user_id=row["user_id"],
+                topic_id=row["topic_id"],
+                description=row["description"],
+                target_sessions=row["target_sessions"],
+                completed_sessions=row["completed_sessions"],
+                created_at=row["created_at"],
+                due_date=row["due_date"],
+            )
+        )
+
+    db.commit()
+    return created
 
 app = FastAPI(title="AI Tutoring MVP")
 
@@ -502,6 +572,20 @@ def create_goal(goal: schemas.GoalCreate, db: sqlite3.Connection = Depends(datab
         created_at=row["created_at"],
         due_date=row["due_date"],
     )
+
+
+@app.post("/goals/templates/{subject}", response_model=list[schemas.Goal], status_code=status.HTTP_201_CREATED)
+def generate_template_goals(
+    subject: str,
+    request: schemas.GoalTemplateRequest,
+    db: sqlite3.Connection = Depends(database.get_db),
+):
+    """Create default goals for a user based on subject templates."""
+    cursor = db.cursor()
+    cursor.execute("SELECT id FROM users WHERE id = ?", (request.user_id,))
+    if not cursor.fetchone():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return create_goals_from_template(request.user_id, subject, db)
 
 
 @app.post("/goals/{goal_id}/complete", response_model=schemas.Goal)

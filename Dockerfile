@@ -19,6 +19,12 @@ RUN npm install && npm run build
 
 WORKDIR /app
 
+# Copy system prompt configuration
+COPY prompt.txt /app/prompt.txt
+
+# Expose the path to the system prompt so the application can load it
+ENV SYSTEM_PROMPT_PATH=/app/prompt.txt
+
 # Expose API and frontend ports
 EXPOSE 8000
 EXPOSE 3000
