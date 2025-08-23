@@ -23,3 +23,5 @@ export const fetchMaterials = (subject, category) => {
   const path = category ? `/materials/${subject}/${category}` : `/materials/${subject}`;
   return request(path);
 };
+export const submitFeedback = (data) =>
+  request('/feedback', { method: 'POST', body: JSON.stringify(data) });

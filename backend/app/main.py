@@ -100,19 +100,28 @@ def build_context(user_id: int, thread_id: int, db: sqlite3.Connection) -> str:
         # Separate older messages from the recent ones
         summary_rows = all_rows[:-MAX_CONTEXT_MESSAGES]
         recent_rows = all_rows[-MAX_CONTEXT_MESSAGES:]
-        if not summary_text:
-            # Create a naive summary by concatenating the older exchanges. In a
-            # production system, this would call an LLM to generate a concise
-            # summary instead.
-            summary_parts = [
-                f"Student: {r['message']} Tutor: {r['response']}" for r in summary_rows
-            ]
-            summary_text = " | ".join(summary_parts)
-            cursor.execute(
-                "INSERT OR REPLACE INTO summaries (user_id, thread_id, summary) VALUES (?, ?, ?)",
-                (user_id, thread_id, summary_text),
-            )
-            db.commit()
+
+        # Always regenerate the summary from all older exchanges.  If a
+        # previous summary exists, include it so we do not lose the
+        # information it already captured.  In a production system an LLM
+        # could be used here to condense the text; for now we simply
+        # concatenate the exchanges.
+        summary_parts: list[str] = []
+        if summary_text:
+            summary_parts.append(summary_text)
+        summary_parts.extend(
+            f"Student: {r['message']} Tutor: {r['response']}" for r in summary_rows
+        )
+        new_summary = " | ".join(summary_parts)
+
+        summary_obj = schemas.Summary(
+            user_id=user_id, thread_id=thread_id, summary=new_summary
+        )
+        if summary_text:
+            update_summary(summary_obj, db)
+        else:
+            create_summary(summary_obj, db)
+        summary_text = new_summary
     else:
         # No summary needed; ensure any existing summary is cleared
         if summary_text:
