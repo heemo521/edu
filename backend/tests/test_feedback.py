@@ -5,8 +5,8 @@ import unittest
 
 from fastapi.testclient import TestClient
 
-from ai_tutoring_mvp.backend.app.main import app
-from ai_tutoring_mvp.backend.app import database
+from backend.app.main import app
+from backend.app import database
 
 
 class FeedbackTestCase(unittest.TestCase):

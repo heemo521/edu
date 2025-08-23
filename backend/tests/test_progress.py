@@ -52,6 +52,30 @@ class ProgressTestCase(unittest.TestCase):
         self.assertGreaterEqual(dash2['xp'], 300)
         self.assertGreaterEqual(dash2['level'], 2)
 
+    def test_goal_completion_bonus(self):
+        """Completing a goal awards bonus XP in addition to progress XP."""
+        # Register a new user
+        reg = self.client.post('/register', json={'username': 'bonus', 'password': 'pw', 'role': 'student'})
+        self.assertEqual(reg.status_code, 201)
+        user_id = reg.json()['id']
+        # Create a goal requiring a single session
+        topic_id = self.client.get('/topics').json()[0]['id']
+        goal_res = self.client.post(
+            '/goals',
+            json={'user_id': user_id, 'topic_id': topic_id, 'description': 'one', 'target_sessions': 1}
+        )
+        self.assertEqual(goal_res.status_code, 201)
+        goal_id = goal_res.json()['id']
+        # Ensure initial XP is zero
+        dash_before = self.client.get(f'/dashboard/{user_id}').json()
+        self.assertEqual(dash_before['xp'], 0)
+        # Complete the goal; should award 50 bonus + 10 progress XP
+        comp = self.client.post(f'/goals/{goal_id}/complete')
+        self.assertEqual(comp.status_code, 200)
+        dash_after = self.client.get(f'/dashboard/{user_id}').json()
+        self.assertEqual(dash_after['xp'], 60)
+        self.assertEqual(dash_after['level'], 0)
+
     def test_streak_counting(self):
         """Verify that streaks increment on consecutive days and reset after a gap."""
         # Manually open a new SQLite connection for direct progress updates
