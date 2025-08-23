@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { fetchMaterials } from '../services/api.js';
+import { fetchMaterials, submitFeedback } from '../services/api.js';
+import { useAppContext } from '../context/AppContext.jsx';
+import Rating from './Rating.jsx';
 
 export default function StudyMaterials() {
   const [subject, setSubject] = useState('math');
   const [category, setCategory] = useState('');
   const [materials, setMaterials] = useState([]);
+  const { userId } = useAppContext();
 
   useEffect(() => {
     fetchMaterials(subject, category).then(setMaterials).catch(console.error);
@@ -24,7 +27,10 @@ export default function StudyMaterials() {
       </select>
       <ul>
         {materials.map((m) => (
-          <li key={m.id}>{m.title}</li>
+          <li key={m.id}>
+            {m.title}
+            <Rating onRate={(r) => submitFeedback({ user_id: userId, topic_id: m.id, rating: r, comments: '' })} />
+          </li>
         ))}
       </ul>
     </div>
