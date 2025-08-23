@@ -68,6 +68,14 @@ def build_context(user_id: int, thread_id: int, db: sqlite3.Connection) -> str:
         goals_parts.append(f"{desc} ({completed}/{target} sessions)")
     goals_text = "; ".join(goals_parts) if goals_parts else "No active goals"
 
+    # Check for an existing stored summary for this thread
+    cursor.execute(
+        "SELECT summary FROM summaries WHERE user_id = ? AND thread_id = ?",
+        (user_id, thread_id),
+    )
+    row = cursor.fetchone()
+    summary_text = row["summary"] if row else ""
+
     # Fetch all messages in this thread in chronological order
     cursor.execute(
         "SELECT message, response FROM messages WHERE user_id = ? AND thread_id = ? ORDER BY timestamp ASC",
@@ -76,31 +84,33 @@ def build_context(user_id: int, thread_id: int, db: sqlite3.Connection) -> str:
     all_rows = cursor.fetchall()
     total_count = len(all_rows)
 
-    summary_text = ""
     recent_rows = all_rows
     if total_count > MAX_CONTEXT_MESSAGES:
         # Separate older messages from the recent ones
         summary_rows = all_rows[:-MAX_CONTEXT_MESSAGES]
         recent_rows = all_rows[-MAX_CONTEXT_MESSAGES:]
-        # Create a naive summary by concatenating the older exchanges. In a
-        # production system, this would call an LLM to generate a concise
-        # summary instead.
-        summary_parts = [
-            f"Student: {r['message']} Tutor: {r['response']}" for r in summary_rows
-        ]
-        summary_text = " | ".join(summary_parts)
-        cursor.execute(
-            "INSERT OR REPLACE INTO summaries (user_id, thread_id, summary) VALUES (?, ?, ?)",
-            (user_id, thread_id, summary_text),
-        )
-        db.commit()
+        if not summary_text:
+            # Create a naive summary by concatenating the older exchanges. In a
+            # production system, this would call an LLM to generate a concise
+            # summary instead.
+            summary_parts = [
+                f"Student: {r['message']} Tutor: {r['response']}" for r in summary_rows
+            ]
+            summary_text = " | ".join(summary_parts)
+            cursor.execute(
+                "INSERT OR REPLACE INTO summaries (user_id, thread_id, summary) VALUES (?, ?, ?)",
+                (user_id, thread_id, summary_text),
+            )
+            db.commit()
     else:
         # No summary needed; ensure any existing summary is cleared
-        cursor.execute(
-            "DELETE FROM summaries WHERE user_id = ? AND thread_id = ?",
-            (user_id, thread_id),
-        )
-        db.commit()
+        if summary_text:
+            cursor.execute(
+                "DELETE FROM summaries WHERE user_id = ? AND thread_id = ?",
+                (user_id, thread_id),
+            )
+            db.commit()
+            summary_text = ""
 
     history_parts: list[str] = []
     if summary_text:
