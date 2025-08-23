@@ -139,6 +139,10 @@ def init_db() -> None:
                 comments TEXT,
                 FOREIGN KEY (user_id) REFERENCES users(id),
                 FOREIGN KEY (topic_id) REFERENCES topics(id)
+            )
+            """
+        )
+
         # Create table for study plans. A plan groups multiple goals for a user
         # and includes scheduling information such as due dates and recurring
         # cadence (e.g. weekly).
