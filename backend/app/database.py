@@ -126,6 +126,19 @@ def init_db() -> None:
             """
         )
 
+        # Create table for user feedback on study materials. Each entry records
+        # which user rated which topic, the numeric rating and optional
+        # comments.  Feedback helps improve content quality over time.
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                topic_id INTEGER NOT NULL,
+                rating INTEGER NOT NULL,
+                comments TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (topic_id) REFERENCES topics(id)
         # Create table for study plans. A plan groups multiple goals for a user
         # and includes scheduling information such as due dates and recurring
         # cadence (e.g. weekly).

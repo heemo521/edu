@@ -555,6 +555,61 @@ def complete_goal(goal_id: int, db: sqlite3.Connection = Depends(database.get_db
     )
 
 
+# ---------------------- Feedback Endpoints ----------------------
+
+@app.post("/feedback", response_model=schemas.Feedback, status_code=status.HTTP_201_CREATED)
+def create_feedback(feedback: schemas.FeedbackCreate, db: sqlite3.Connection = Depends(database.get_db)):
+    """Store user feedback for a topic."""
+    cursor = db.cursor()
+    # Validate that user and topic exist
+    cursor.execute("SELECT id FROM users WHERE id = ?", (feedback.user_id,))
+    if not cursor.fetchone():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    cursor.execute("SELECT id FROM topics WHERE id = ?", (feedback.topic_id,))
+    if not cursor.fetchone():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Topic not found")
+    cursor.execute(
+        "INSERT INTO feedback (user_id, topic_id, rating, comments) VALUES (?, ?, ?, ?)",
+        (feedback.user_id, feedback.topic_id, feedback.rating, feedback.comments),
+    )
+    db.commit()
+    feedback_id = cursor.lastrowid
+    cursor.execute(
+        "SELECT id, user_id, topic_id, rating, comments FROM feedback WHERE id = ?",
+        (feedback_id,),
+    )
+    row = cursor.fetchone()
+    return schemas.Feedback(
+        id=row["id"],
+        user_id=row["user_id"],
+        topic_id=row["topic_id"],
+        rating=row["rating"],
+        comments=row["comments"],
+    )
+
+
+@app.get("/feedback/{topic_id}", response_model=list[schemas.Feedback])
+def list_feedback(topic_id: int, db: sqlite3.Connection = Depends(database.get_db)):
+    """Return all feedback entries for a given topic."""
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id, user_id, topic_id, rating, comments FROM feedback WHERE topic_id = ? ORDER BY id ASC",
+        (topic_id,),
+    )
+    rows = cursor.fetchall()
+    feedback_list: list[schemas.Feedback] = []
+    for row in rows:
+        feedback_list.append(
+            schemas.Feedback(
+                id=row["id"],
+                user_id=row["user_id"],
+                topic_id=row["topic_id"],
+                rating=row["rating"],
+                comments=row["comments"],
+            )
+        )
+    return feedback_list
+
 # ---------------------- Summary Endpoints ----------------------
 
 @app.get("/summaries/{user_id}/{thread_id}", response_model=schemas.Summary)
@@ -595,7 +650,6 @@ def update_summary(summary: schemas.Summary, db: sqlite3.Connection = Depends(da
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Summary not found")
     db.commit()
     return summary
-=======
 # ---------------------- Plan Endpoints ----------------------
 
 @app.post("/plans", response_model=schemas.Plan, status_code=status.HTTP_201_CREATED)
