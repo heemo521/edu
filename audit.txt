@@ -1,0 +1,29 @@
+Audit of Repository vs MVP Requirements
+
+1. Core Functionality: Personalized AI Tutoring
+   - FastAPI backend supports multiple conversation threads per user and maintains message history using summarization logic.
+   - Conversations can include user goals; feedback endpoints exist, but dynamic style adjustment is not implemented.
+
+2. Structured Curriculum & Study Materials
+   - Study materials and goal templates load from JSON files at startup.
+   - Goal templates can generate goals, but interactive assignments or quizzes are absent.
+
+3. Self-Improving Loop & Progress Tracking
+   - Progress and feedback endpoints record user activity.
+   - Automatic difficulty adjustment and visual progress dashboards are not implemented.
+
+4. Intelligent Agent & Prompt Engine
+   - The tutor integrates a local LLaMA model via Ollama with a configurable system prompt file.
+   - Modular prompt scaffolding and support for interchangeable models remain limited.
+
+5. Fullstack MVP: Robust, Usable, Deployable
+   - React frontend, FastAPI backend, Dockerfile, and docker-compose are provided.
+   - SQLite is used instead of PostgreSQL, and one-click deployment is incomplete.
+
+6. Developer Experience & Maintainability
+   - Repository includes tests, requirements, and a README.
+   - Test coverage targets, contribution guides, and a roadmap are missing.
+
+7. Readiness for Launch & User Feedback
+   - Registration flow and goal templates offer initial onboarding.
+   - Analytics, usage tracking, and bug-report channels are not yet implemented.
