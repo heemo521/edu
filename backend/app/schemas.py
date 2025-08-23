@@ -131,3 +131,8 @@ class Goal(GoalBase):
 
     class Config:
         from_attributes = True
+
+
+class GoalTemplateRequest(BaseModel):
+    """Request body for generating goals from a template."""
+    user_id: int

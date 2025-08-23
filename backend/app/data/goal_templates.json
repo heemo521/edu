@@ -1,0 +1,26 @@
+{
+  "math": [
+    {
+      "topic": "Algebra I",
+      "description": "Practice linear equations and functions",
+      "target_sessions": 5
+    },
+    {
+      "topic": "Geometry",
+      "description": "Review triangle properties and proofs",
+      "target_sessions": 4
+    }
+  ],
+  "science": [
+    {
+      "topic": "Biology",
+      "description": "Study cell structure and genetics",
+      "target_sessions": 3
+    },
+    {
+      "topic": "Chemistry",
+      "description": "Understand the periodic table and reactions",
+      "target_sessions": 3
+    }
+  ]
+}

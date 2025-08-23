@@ -78,6 +78,22 @@ class APITestCase(unittest.TestCase):
         self.assertEqual(cancel.status_code, 200)
         self.assertEqual(cancel.json()['status'], 'inactive')
 
+    def test_goal_templates(self):
+        # Register user
+        reg = self.client.post('/register', json={'username': 'sara', 'password': 'pass', 'role': 'student'})
+        user_id = reg.json()['id']
+
+        # Generate goals from math template
+        res = self.client.post(f'/goals/templates/math', json={'user_id': user_id})
+        self.assertEqual(res.status_code, 201)
+        goals = res.json()
+        self.assertEqual(len(goals), 2)
+
+        # Verify goals persisted
+        list_res = self.client.get(f'/goals/{user_id}')
+        self.assertEqual(list_res.status_code, 200)
+        self.assertEqual(len(list_res.json()), 2)
+
 
 if __name__ == '__main__':
     unittest.main()
