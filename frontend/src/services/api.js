@@ -17,7 +17,10 @@ export const sendChatMessage = (userId, threadId, message) =>
   request('/chat', { method: 'POST', body: JSON.stringify({ userId, threadId, message }) });
 export const fetchDashboard = (userId) => request(`/dashboard/${userId}`);
 export const fetchGoals = (userId) => request(`/goals/${userId}`);
+export const fetchPlans = (userId) => request(`/plans/${userId}`);
 export const fetchMaterials = (subject, category) => {
   const path = category ? `/materials/${subject}/${category}` : `/materials/${subject}`;
   return request(path);
 };
+export const submitFeedback = (data) =>
+  request('/feedback', { method: 'POST', body: JSON.stringify(data) });
