@@ -1,7 +1,3 @@
-import { useEffect, useState } from 'react';
-import { fetchPlans } from '../services/api.js';
-import { useAppContext } from '../context/AppContext.jsx';
-
 /**
  * Display a list of study plans.
  *
@@ -9,41 +5,23 @@ import { useAppContext } from '../context/AppContext.jsx';
  * Each plan contains an id, optional due date and a list of goals
  * with at least a `title` field.
  */
-const PlanCard = ({ plans = [] }) => (
-  <div className="card">
-    <h2>Plans</h2>
-    {plans.length === 0 ? (
-      <p>No plans yet.</p>
-    ) : (
-      <ul>
-        {plans.map((plan) => (
-          <li key={plan.id}>
-            {plan.goals.map((g) => g.title).join(', ')}
-            {plan.due_date ? ` - Due ${plan.due_date}` : ''}
-          </li>
-        ))}
-      </ul>
-    )}
-  </div>
-);
-
-  useEffect(() => {
-    if (!userId) return;
-    fetchPlans(userId).then(setPlans).catch(console.error);
-  }, [userId]);
-
+export default function PlanCard({ plans = [] }) {
   return (
     <div className="card">
       <h2>Plans</h2>
-      {plans.length ? (
+      {plans.length === 0 ? (
+        <p>No plans yet.</p>
+      ) : (
         <ul>
-          {plans.map((p) => (
-            <li key={p.id}>{p.recurrence || 'One-time'}{p.due_date ? ` - due ${p.due_date}` : ''}</li>
+          {plans.map((plan) => (
+            <li key={plan.id}>
+              {plan.goals.map((g) => g.title).join(', ')}
+              {plan.due_date ? ` - Due ${plan.due_date}` : ''}
+            </li>
           ))}
         </ul>
-      ) : (
-        <p>No plans yet.</p>
       )}
     </div>
   );
 }
+
