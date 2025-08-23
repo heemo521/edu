@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { fetchHistory, sendChatMessage } from '../services/api.js';
 import { useAppContext } from '../context/AppContext.jsx';
+import ThreadsTabs from '../components/ThreadsTabs.jsx';
+import ContextWarning from '../components/ContextWarning.jsx';
 
 export default function Chat() {
   const { userId, currentThreadId, xp, setXp } = useAppContext();
@@ -23,6 +25,8 @@ export default function Chat() {
 
   return (
     <div className="chat">
+      <ThreadsTabs />
+      <ContextWarning />
       <div className="messages">
         {messages.map((m, i) => (
           <div key={i} className={m.sender}>{m.text}</div>

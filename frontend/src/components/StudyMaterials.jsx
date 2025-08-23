@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import { fetchMaterials } from '../services/api.js';
 
 export default function StudyMaterials() {
-  const [subject, setSubject] = useState('math');
-  const [category, setCategory] = useState('');
+  const [subject, setSubject] = useState(() => localStorage.getItem('subject') || 'math');
+  const [category, setCategory] = useState(() => localStorage.getItem('category') || '');
   const [materials, setMaterials] = useState([]);
 
   useEffect(() => {
+    localStorage.setItem('subject', subject);
+    localStorage.setItem('category', category);
     fetchMaterials(subject, category).then(setMaterials).catch(console.error);
   }, [subject, category]);
 

@@ -1,10 +1,28 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
+import { fetchPlans } from '../services/api.js';
+import { useAppContext } from '../context/AppContext.jsx';
 
-const PlanCard = () => (
-  <div className="card">
-    <h2>Plans</h2>
-    <p>No plans yet.</p>
-  </div>
-);
+export default function PlanCard() {
+  const { userId } = useAppContext();
+  const [plans, setPlans] = useState([]);
 
-export default PlanCard;
+  useEffect(() => {
+    if (!userId) return;
+    fetchPlans(userId).then(setPlans).catch(console.error);
+  }, [userId]);
+
+  return (
+    <div className="card">
+      <h2>Plans</h2>
+      {plans.length ? (
+        <ul>
+          {plans.map((p) => (
+            <li key={p.id}>{p.recurrence || 'One-time'}{p.due_date ? ` - due ${p.due_date}` : ''}</li>
+          ))}
+        </ul>
+      ) : (
+        <p>No plans yet.</p>
+      )}
+    </div>
+  );
+}
