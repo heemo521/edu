@@ -1,0 +1,284 @@
+    1: from fastapi import FastAPI, Depends, HTTPException, status
+    1: from fastapi.middleware.cors import CORSMiddleware
+    1: import sqlite3
+       
+    1: from . import schemas, database, auth, tutor
+    1: from . import progress
+       
+    1: app = FastAPI(title="AI Tutoring MVP")
+       
+       # Configure CORS to allow frontend access (e.g., from localhost:8000 and file://)
+    2: app.add_middleware(
+    1:     CORSMiddleware,
+    1:     allow_origins=["*"],
+    1:     allow_credentials=True,
+    1:     allow_methods=["*"],
+    1:     allow_headers=["*"],
+       )
+       
+       
+    2: @app.get("/")
+    2: def read_root():
+           """Root endpoint for health check."""
+           return {"message": "Welcome to the AI Tutoring MVP!"}
+       
+       
+    2: @app.post("/register", response_model=schemas.UserOut, status_code=status.HTTP_201_CREATED)
+    2: def register_user(user: schemas.UserCreate, db: sqlite3.Connection = Depends(database.get_db)):
+           """Register a new user.
+       
+           Checks for existing username, hashes the password and stores the new user.
+           """
+           # Check if username already exists
+    6:     cursor = db.cursor()
+    6:     cursor.execute("SELECT id FROM users WHERE username = ?", (user.username,))
+    6:     if cursor.fetchone():
+    1:         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already registered")
+           # Create user
+    5:     hashed = auth.get_password_hash(user.password)
+   10:     cursor.execute(
+    5:         "INSERT INTO users (username, hashed_password, role) VALUES (?, ?, ?)",
+    5:         (user.username, hashed, user.role),
+           )
+    5:     db.commit()
+    5:     user_id = cursor.lastrowid
+    5:     return schemas.UserOut(id=user_id, username=user.username, role=user.role)
+       
+       
+    2: @app.post("/login")
+    2: def login(login_request: schemas.LoginRequest, db: sqlite3.Connection = Depends(database.get_db)):
+           """Authenticate a user and return a simple success message.
+       
+           In a full implementation this would return a JWT or session token. For this MVP
+           we simply verify credentials and respond with a confirmation.
+           """
+    2:     cursor = db.cursor()
+    4:     cursor.execute(
+    2:         "SELECT id, username, hashed_password, role FROM users WHERE username = ?", (login_request.username,)
+           )
+    2:     row = cursor.fetchone()
+    2:     if not row or not auth.verify_password(login_request.password, row["hashed_password"]):
+    1:         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+    1:     return {"message": "Login successful", "user_id": row["id"], "role": row["role"]}
+       
+       
+    2: @app.get("/users/{user_id}")
+    2: def get_user_info(user_id: int, db: sqlite3.Connection = Depends(database.get_db)):
+           """Return basic user information along with subscription status and message count."""
+           cursor = db.cursor()
+           cursor.execute(
+               "SELECT username, role FROM users WHERE id = ?",
+               (user_id,),
+           )
+           user = cursor.fetchone()
+           if not user:
+               raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+           # Get subscription status
+           cursor.execute(
+               "SELECT status FROM subscriptions WHERE user_id = ?",
+               (user_id,),
+           )
+           sub = cursor.fetchone()
+           status_val = sub["status"] if sub else "inactive"
+           # Get message count
+           cursor.execute(
+               "SELECT COUNT(*) AS count FROM messages WHERE user_id = ?",
+               (user_id,),
+           )
+           count_row = cursor.fetchone()
+           message_count = count_row["count"] if count_row else 0
+           # Get progress metrics (XP, level, streak) from users table
+           cursor.execute(
+               "SELECT xp, level, streak_count FROM users WHERE id = ?",
+               (user_id,),
+           )
+           progress_row = cursor.fetchone()
+           xp_val = progress_row["xp"] if progress_row and progress_row["xp"] is not None else 0
+           level_val = progress_row["level"] if progress_row and progress_row["level"] is not None else 0
+           streak_val = (
+               progress_row["streak_count"]
+               if progress_row and progress_row["streak_count"] is not None
+               else 0
+           )
+           return {
+               "id": user_id,
+               "username": user["username"],
+               "role": user["role"],
+               "subscription_status": status_val,
+               "message_count": message_count,
+               "xp": xp_val,
+               "level": level_val,
+               "streak_count": streak_val,
+           }
+       
+       
+    2: @app.post("/chat", response_model=schemas.ChatResponse)
+    2: def chat(request: schemas.ChatRequest, db: sqlite3.Connection = Depends(database.get_db)):
+           """Handle a chat message from a user and return a tutor response.
+       
+           Args:
+               request: ChatRequest containing the user_id and message.
+               db: SQLite connection (unused for this stub but provided for future expansion).
+       
+           Returns:
+               ChatResponse with the AI tutor's reply.
+           """
+           # In a full implementation we could use user_id to personalize the response
+   32:     answer = tutor.get_tutor_response(request.message)
+           # Insert chat log into messages table for progress tracking
+   32:     cursor = db.cursor()
+   64:     cursor.execute(
+   32:         "INSERT INTO messages (user_id, message, response) VALUES (?, ?, ?)",
+   32:         (request.user_id, request.message, answer),
+           )
+   32:     db.commit()
+           # After recording the message, update the user's progress (XP, level, streak).
+   32:     try:
+   32:         progress.update_progress(request.user_id, db)
+           except Exception:
+               # Fail silently on progress update; chat functionality should not be blocked
+               pass
+   32:     return schemas.ChatResponse(response=answer)
+       
+       
+    2: @app.get("/history/{user_id}", response_model=list[schemas.HistoryItem])
+    2: def get_history(user_id: int, db: sqlite3.Connection = Depends(database.get_db)):
+           """Return the chat history for a specific user ordered by timestamp."""
+    1:     cursor = db.cursor()
+    2:     cursor.execute(
+    1:         "SELECT message, response, timestamp FROM messages WHERE user_id = ? ORDER BY timestamp ASC",
+    1:         (user_id,),
+           )
+    1:     rows = cursor.fetchall()
+    7:     history = [
+    4:         schemas.HistoryItem(
+    2:             message=row["message"], response=row["response"], timestamp=row["timestamp"]
+               )
+    3:         for row in rows
+           ]
+    1:     return history
+       
+       
+    2: @app.get("/dashboard/{user_id}")
+    2: def get_dashboard(user_id: int, db: sqlite3.Connection = Depends(database.get_db)):
+           """Return a simple dashboard summary for a user.
+       
+           The dashboard includes the number of chat messages exchanged and the timestamp
+           of the most recent message. In future versions, this could include topic
+           mastery, accuracy and personalized recommendations.
+           """
+    3:     cursor = db.cursor()
+           # Count total messages and last activity
+    6:     cursor.execute(
+    3:         "SELECT COUNT(*) AS count, MAX(timestamp) AS last_ts FROM messages WHERE user_id = ?",
+    3:         (user_id,),
+           )
+    3:     row = cursor.fetchone()
+    3:     total_messages = row["count"] if row["count"] is not None else 0
+    3:     last_timestamp = row["last_ts"] if row["last_ts"] else None
+           # Count distinct session days
+    6:     cursor.execute(
+    3:         "SELECT COUNT(DISTINCT DATE(timestamp)) AS sessions FROM messages WHERE user_id = ?",
+    3:         (user_id,),
+           )
+    3:     session_row = cursor.fetchone()
+    3:     sessions_count = session_row["sessions"] if session_row and session_row["sessions"] is not None else 0
+           # Determine badges based on total messages and sessions
+    3:     badges: list[str] = []
+    3:     if total_messages >= 1:
+    3:         badges.append("First Chat Completed")
+    3:     if total_messages >= 10:
+    2:         badges.append("10 Messages")
+    3:     if sessions_count >= 5:
+               badges.append("5 Sessions")
+           # Include progress metrics (XP, level, streak) in dashboard
+    6:     cursor.execute(
+    3:         "SELECT xp, level, streak_count FROM users WHERE id = ?",
+    3:         (user_id,),
+           )
+    3:     p_row = cursor.fetchone()
+    3:     xp_val = p_row["xp"] if p_row and p_row["xp"] is not None else 0
+    3:     level_val = p_row["level"] if p_row and p_row["level"] is not None else 0
+    3:     streak_val = p_row["streak_count"] if p_row and p_row["streak_count"] is not None else 0
+    3:     return {
+    3:         "user_id": user_id,
+    3:         "total_messages": total_messages,
+    3:         "last_activity": last_timestamp,
+    3:         "sessions_count": sessions_count,
+    3:         "badges": badges,
+    3:         "xp": xp_val,
+    3:         "level": level_val,
+    3:         "streak_count": streak_val,
+           }
+       
+       
+    2: @app.post("/subscribe", response_model=schemas.SubscriptionStatus)
+    2: def manage_subscription(req: schemas.SubscriptionRequest, db: sqlite3.Connection = Depends(database.get_db)):
+           """Activate or cancel a user's subscription.
+       
+           For the MVP, this endpoint simulates subscription management without real payment processing. If the action
+           is 'activate', the subscription is marked active and the start date is set to now. If the action is 'cancel',
+           the status becomes inactive and the end date is set to now.
+           """
+    2:     cursor = db.cursor()
+           # Check if subscription record exists
+    4:     cursor.execute(
+    2:         "SELECT id, status, start_date, end_date FROM subscriptions WHERE user_id = ?",
+    2:         (req.user_id,),
+           )
+    2:     row = cursor.fetchone()
+    2:     import datetime
+    2:     now = datetime.datetime.utcnow().isoformat(sep=" ", timespec="seconds")
+    2:     if req.action == "activate":
+    1:         if row:
+                   # Update existing record
+                   cursor.execute(
+                       "UPDATE subscriptions SET status = 'active', start_date = ?, end_date = NULL WHERE user_id = ?",
+                       (now, req.user_id),
+                   )
+               else:
+    2:             cursor.execute(
+    1:                 "INSERT INTO subscriptions (user_id, status, start_date) VALUES (?, 'active', ?)",
+    1:                 (req.user_id, now),
+                   )
+    1:         db.commit()
+    1:         return schemas.SubscriptionStatus(user_id=req.user_id, status="active", start_date=now)
+    1:     elif req.action == "cancel":
+    1:         if row and row["status"] == "active":
+    2:             cursor.execute(
+    1:                 "UPDATE subscriptions SET status = 'inactive', end_date = ? WHERE user_id = ?",
+    1:                 (now, req.user_id),
+                   )
+    1:             db.commit()
+    2:             return schemas.SubscriptionStatus(
+    1:                 user_id=req.user_id, status="inactive", start_date=row["start_date"], end_date=now
+                   )
+               else:
+                   raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Subscription not active")
+           else:
+               raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid action")
+       
+       
+    2: @app.get("/subscription/{user_id}", response_model=schemas.SubscriptionStatus)
+    2: def get_subscription_status(user_id: int, db: sqlite3.Connection = Depends(database.get_db)):
+           """Get the current subscription status for a user."""
+    1:     cursor = db.cursor()
+    2:     cursor.execute(
+    1:         "SELECT status, start_date, end_date FROM subscriptions WHERE user_id = ?",
+    1:         (user_id,),
+           )
+    1:     row = cursor.fetchone()
+    1:     if not row:
+    1:         return schemas.SubscriptionStatus(user_id=user_id, status="inactive")
+           return schemas.SubscriptionStatus(
+               user_id=user_id,
+               status=row["status"],
+               start_date=row["start_date"],
+               end_date=row["end_date"],
+           )
+       
+       
+    1: if __name__ == "__main__":  # pragma: no cover
+           # Run the application with uvicorn when executed directly.
+           import uvicorn
+           uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

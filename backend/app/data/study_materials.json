@@ -1,0 +1,409 @@
+{
+  "math": {
+    "algebra": {
+      "title": "Algebra I",
+      "units": [
+        {
+          "name": "Expressions and Polynomials",
+          "topics": [
+            {
+              "name": "Expressions and combining like terms",
+              "content": "Identify parts of an expression, combine like terms, and simplify expressions using the distributive property."
+            },
+            {
+              "name": "Exponents and radicals",
+              "content": "Apply the laws of exponents to simplify expressions with integer exponents and radicals."
+            },
+            {
+              "name": "Operations with polynomials",
+              "content": "Add, subtract, and multiply polynomials; factor quadratic and higher-degree polynomials."
+            }
+          ]
+        },
+        {
+          "name": "Equations and Inequalities",
+          "topics": [
+            {
+              "name": "Linear equations",
+              "content": "Solve single-variable linear equations and understand slope-intercept, point-slope and standard forms."
+            },
+            {
+              "name": "Systems of equations",
+              "content": "Solve systems of linear equations using graphing, substitution and elimination methods."
+            },
+            {
+              "name": "Inequalities",
+              "content": "Solve and graph linear inequalities and compound inequalities."
+            }
+          ]
+        },
+        {
+          "name": "Functions and Quadratics",
+          "topics": [
+            {
+              "name": "Functions",
+              "content": "Understand function notation, domain and range; evaluate and graph linear, piecewise and exponential functions."
+            },
+            {
+              "name": "Quadratic functions",
+              "content": "Analyze quadratic functions in standard, vertex and factored form; solve quadratic equations by factoring, completing the square and quadratic formula."
+            }
+          ]
+        }
+      ]
+    },
+    "geometry": {
+      "title": "Geometry",
+      "units": [
+        {
+          "name": "Lines, Angles and Triangles",
+          "topics": [
+            {
+              "name": "Lines and angles",
+              "content": "Explore parallel and perpendicular lines, angle relationships and basic constructions."
+            },
+            {
+              "name": "Triangle congruence",
+              "content": "Prove triangles congruent using SSS, SAS, ASA, AAS and HL criteria; use rigid motions."
+            },
+            {
+              "name": "Similarity and right triangles",
+              "content": "Use dilations and similarity theorems; apply the Pythagorean theorem and trigonometric ratios in right triangles."
+            }
+          ]
+        },
+        {
+          "name": "Polygons, Circles and Measurement",
+          "topics": [
+            {
+              "name": "Polygons and quadrilaterals",
+              "content": "Classify polygons, examine properties of parallelograms, trapezoids and special quadrilaterals."
+            },
+            {
+              "name": "Circles",
+              "content": "Investigate chords, arcs, tangents and inscribed angles; use circle theorems to find measures."
+            },
+            {
+              "name": "Area and volume",
+              "content": "Calculate perimeter, area and surface area of 2-D figures; find volume of prisms, cylinders, pyramids and cones."
+            }
+          ]
+        }
+      ]
+    },
+    "calculus": {
+      "title": "Calculus AB",
+      "units": [
+        {
+          "name": "Limits and Continuity",
+          "topics": [
+            {
+              "name": "Limits and properties",
+              "content": "Evaluate limits graphically and algebraically; use limit laws and special limits."
+            },
+            {
+              "name": "Continuity and the Intermediate Value Theorem",
+              "content": "Determine continuity and apply the Intermediate Value Theorem to justify solutions."
+            }
+          ]
+        },
+        {
+          "name": "Derivatives",
+          "topics": [
+            {
+              "name": "Definition and rules",
+              "content": "Understand the derivative as an instantaneous rate of change; compute derivatives using power, product, quotient and chain rules."
+            },
+            {
+              "name": "Applications of derivatives",
+              "content": "Analyze motion, related rates, optimization and curve sketching using derivatives."
+            }
+          ]
+        },
+        {
+          "name": "Integrals and Applications",
+          "topics": [
+            {
+              "name": "Definite integrals and the Fundamental Theorem",
+              "content": "Approximate area under a curve with Riemann sums; evaluate definite integrals; apply the Fundamental Theorem of Calculus."
+            },
+            {
+              "name": "Differential equations and accumulation",
+              "content": "Solve basic differential equations and apply models for exponential growth and decay; compute areas and volumes."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "science": {
+    "biology": {
+      "title": "Biology",
+      "units": [
+        {
+          "name": "Cell and Molecular Biology",
+          "topics": [
+            {
+              "name": "Chemistry of life",
+              "content": "Describe the properties of water and macromolecules (carbohydrates, lipids, proteins and nucleic acids)."
+            },
+            {
+              "name": "Cell structure and function",
+              "content": "Identify organelles, cell membranes and transport mechanisms; compare prokaryotic and eukaryotic cells."
+            },
+            {
+              "name": "Cellular energetics",
+              "content": "Explain enzyme function and metabolism; describe photosynthesis and cellular respiration."
+            }
+          ]
+        },
+        {
+          "name": "Genetics and Evolution",
+          "topics": [
+            {
+              "name": "Heredity",
+              "content": "Understand meiosis, Mendelian genetics, non‑Mendelian inheritance and genetic variation."
+            },
+            {
+              "name": "Gene expression and regulation",
+              "content": "Learn about DNA replication, transcription, translation and gene regulation; explore biotechnology."
+            },
+            {
+              "name": "Natural selection",
+              "content": "Investigate Darwin’s theory, population genetics, speciation and evidence for evolution."
+            }
+          ]
+        },
+        {
+          "name": "Ecology",
+          "topics": [
+            {
+              "name": "Ecological interactions",
+              "content": "Study population dynamics, energy flow, nutrient cycles and community interactions."
+            },
+            {
+              "name": "Biodiversity and ecosystems",
+              "content": "Examine ecosystem stability, succession and the impact of environmental change."
+            }
+          ]
+        }
+      ]
+    },
+    "chemistry": {
+      "title": "Chemistry",
+      "units": [
+        {
+          "name": "Structure of Matter",
+          "topics": [
+            {
+              "name": "States of matter and properties",
+              "content": "Describe solids, liquids and gases; interpret phase changes and properties such as density and solubility."
+            },
+            {
+              "name": "Atomic structure and periodicity",
+              "content": "Understand atomic models, electron configuration and periodic trends."
+            },
+            {
+              "name": "Bonding and molecular structure",
+              "content": "Compare ionic, covalent and metallic bonding; predict shapes and polarity using VSEPR and electronegativity."
+            }
+          ]
+        },
+        {
+          "name": "Chemical Reactions",
+          "topics": [
+            {
+              "name": "Stoichiometry",
+              "content": "Balance chemical equations; perform calculations involving moles, mass and limiting reactants."
+            },
+            {
+              "name": "Types of reactions and thermochemistry",
+              "content": "Classify synthesis, decomposition, combustion and redox reactions; explore enthalpy changes and calorimetry."
+            },
+            {
+              "name": "Kinetics and equilibrium",
+              "content": "Examine factors affecting reaction rates; use equilibrium constants and Le Chatelier’s principle."
+            }
+          ]
+        },
+        {
+          "name": "Advanced Topics",
+          "topics": [
+            {
+              "name": "Acids, bases and electrochemistry",
+              "content": "Define pH and pKa; explore acid–base reactions and titrations; understand electrochemical cells."
+            },
+            {
+              "name": "Thermodynamics and nuclear chemistry",
+              "content": "Study entropy, free energy and spontaneity; explore nuclear reactions and applications."
+            }
+          ]
+        }
+      ]
+    },
+    "physics": {
+      "title": "Physics",
+      "units": [
+        {
+          "name": "Mechanics",
+          "topics": [
+            {
+              "name": "Kinematics",
+              "content": "Describe motion in one and two dimensions; use position, velocity and acceleration graphs; analyse projectile motion."
+            },
+            {
+              "name": "Dynamics",
+              "content": "Apply Newton’s laws; analyse friction, tension, normal and gravitational forces."
+            },
+            {
+              "name": "Momentum and energy",
+              "content": "Understand impulse and momentum conservation; explore work, kinetic and potential energy, power and energy conservation."
+            }
+          ]
+        },
+        {
+          "name": "Advanced Mechanics and Waves",
+          "topics": [
+            {
+              "name": "Circular motion and gravitation",
+              "content": "Relate uniform circular motion to centripetal force; understand Newton’s law of universal gravitation."
+            },
+            {
+              "name": "Waves and sound",
+              "content": "Explore wave properties, interference, standing waves and the Doppler effect."
+            },
+            {
+              "name": "Electricity and magnetism",
+              "content": "Investigate electrostatics, electric fields, circuits, magnetism and electromagnetic induction."
+            }
+          ]
+        },
+        {
+          "name": "Modern Physics",
+          "topics": [
+            {
+              "name": "Quantum and atomic physics",
+              "content": "Discuss wave–particle duality, atomic models and the photoelectric effect."
+            },
+            {
+              "name": "Relativity and nuclear physics",
+              "content": "Describe special relativity, mass–energy equivalence and nuclear reactions."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "language_arts": {
+    "english": {
+      "title": "English/Language Arts",
+      "units": [
+        {
+          "name": "Reading and Literature",
+          "topics": [
+            {
+              "name": "Reading comprehension",
+              "content": "Develop skills to identify main ideas, themes, and evidence in literary and informational texts."
+            },
+            {
+              "name": "Literary analysis",
+              "content": "Analyse character, setting, plot, tone and figurative language; explore themes such as coming of age and the hero’s journey."
+            }
+          ]
+        },
+        {
+          "name": "Writing and Composition",
+          "topics": [
+            {
+              "name": "Argumentative and informative writing",
+              "content": "Plan and write structured essays with clear theses, supporting evidence and coherent paragraphs."
+            },
+            {
+              "name": "Narrative and creative writing",
+              "content": "Develop narrative techniques, dialogue, pacing and descriptive details in storytelling."
+            },
+            {
+              "name": "Research skills",
+              "content": "Conduct research, evaluate sources, cite evidence and produce reports or research papers."
+            }
+          ]
+        },
+        {
+          "name": "Language and Communication",
+          "topics": [
+            {
+              "name": "Conventions and grammar",
+              "content": "Master standard English grammar, usage and mechanics."
+            },
+            {
+              "name": "Speaking and listening",
+              "content": "Engage in collaborative discussions; deliver presentations with effective organization and clarity."
+            },
+            {
+              "name": "Vocabulary development",
+              "content": "Build academic and domain-specific vocabulary through context and word study strategies."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "computer_science": {
+    "programming": {
+      "title": "Introduction to Programming",
+      "units": [
+        {
+          "name": "Basics and Data Types",
+          "topics": [
+            {
+              "name": "Getting started and debugging",
+              "content": "Set up a programming environment and practice basic debugging strategies."
+            },
+            {
+              "name": "Variables and data types",
+              "content": "Declare and use variables; understand data types such as integers, floats, strings and booleans."
+            },
+            {
+              "name": "Input and output",
+              "content": "Use input/output functions to interact with the user and display results."
+            }
+          ]
+        },
+        {
+          "name": "Control Flow and Functions",
+          "topics": [
+            {
+              "name": "Conditional statements",
+              "content": "Use if/else statements to make decisions and control program flow."
+            },
+            {
+              "name": "Loops",
+              "content": "Write for and while loops to repeat operations over sequences or based on conditions."
+            },
+            {
+              "name": "Functions and modularity",
+              "content": "Define and call functions to organize code and reuse logic."
+            }
+          ]
+        },
+        {
+          "name": "Data Structures and OOP",
+          "topics": [
+            {
+              "name": "Arrays and lists",
+              "content": "Store and manipulate collections of data using arrays or lists."
+            },
+            {
+              "name": "Classes and objects",
+              "content": "Understand classes as blueprints for objects; create and use objects with attributes and methods."
+            },
+            {
+              "name": "Collections and libraries",
+              "content": "Work with built-in collections such as dictionaries and sets; explore standard libraries."
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

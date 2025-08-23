@@ -1,0 +1,28 @@
+    1: """Stub implementation of the AI tutoring engine.
+       
+       This module provides a simple function to generate responses to user queries.
+       In the MVP, this is a placeholder that echoes the message back with guidance.
+       Later, this can be replaced with calls to a language model or AI service.
+       """
+       
+    1: def get_tutor_response(message: str) -> str:
+           """Generate a response to a student's message.
+       
+           Args:
+               message: The student's input or question.
+       
+           Returns:
+               A string containing the AI tutor's reply.
+           """
+           # Simple heuristic: if the message ends with a question mark, encourage the student to think.
+   32:     trimmed = message.strip()
+   32:     if trimmed.endswith("?"):
+    1:         return (
+    1:             "That's a great question! Let's break it down together. "
+                   "What do you think is the first step to solving it?"
+               )
+           # Otherwise, provide a generic motivational response.
+   31:     return (
+   31:         "I see. Let's explore that. Can you explain how you arrived at this point? "
+               "I'll guide you through the next steps."
+           )

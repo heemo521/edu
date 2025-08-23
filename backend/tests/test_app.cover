@@ -1,0 +1,83 @@
+    1: """Unit tests for AI Tutoring MVP backend endpoints.
+       
+       Uses Python's built-in unittest framework and FastAPI's TestClient to test
+       registration, login, chat, history, dashboard and subscription functionality.
+       """
+       
+    1: import os
+    1: import unittest
+       
+    1: from fastapi.testclient import TestClient
+       
+    1: from ai_tutoring_mvp.backend.app.main import app
+    1: from ai_tutoring_mvp.backend.app import database
+       
+       
+    2: class APITestCase(unittest.TestCase):
+    1:     """Test suite for the AI tutoring backend."""
+       
+    1:     def setUp(self):
+               # Remove existing database to ensure a clean state
+    3:         db_path = os.path.join(os.path.dirname(__file__), '..', 'app', 'ai_tutoring.db')
+               # Resolve absolute path
+    3:         db_path = os.path.abspath(db_path)
+    3:         if os.path.exists(db_path):
+    3:             os.remove(db_path)
+               # Reinitialize DB
+    3:         database.init_db()
+    3:         self.client = TestClient(app)
+       
+    1:     def test_registration_and_login(self):
+               # Register new user
+    1:         res = self.client.post('/register', json={'username': 'test', 'password': 'pass1', 'role': 'student'})
+    1:         self.assertEqual(res.status_code, 201)
+    1:         data = res.json()
+    1:         self.assertIn('id', data)
+               # Duplicate registration should fail
+    1:         dup = self.client.post('/register', json={'username': 'test', 'password': 'pass2', 'role': 'student'})
+    1:         self.assertEqual(dup.status_code, 400)
+               # Login with correct password
+    1:         login = self.client.post('/login', json={'username': 'test', 'password': 'pass1'})
+    1:         self.assertEqual(login.status_code, 200)
+    1:         self.assertIn('user_id', login.json())
+               # Login with incorrect password
+    1:         bad_login = self.client.post('/login', json={'username': 'test', 'password': 'wrong'})
+    1:         self.assertEqual(bad_login.status_code, 401)
+       
+    1:     def test_chat_history_and_dashboard(self):
+               # Setup user
+    1:         reg = self.client.post('/register', json={'username': 'alice', 'password': 'wonder', 'role': 'student'})
+    1:         user_id = reg.json()['id']
+               # Chat interactions
+    1:         self.client.post('/chat', json={'user_id': user_id, 'message': 'What is 1+1?'})
+    1:         self.client.post('/chat', json={'user_id': user_id, 'message': 'OK'})
+               # History
+    1:         hist = self.client.get(f'/history/{user_id}')
+    1:         self.assertEqual(hist.status_code, 200)
+    1:         history = hist.json()
+    1:         self.assertEqual(len(history), 2)
+               # Dashboard
+    1:         dash = self.client.get(f'/dashboard/{user_id}')
+    1:         self.assertEqual(dash.status_code, 200)
+    1:         summary = dash.json()
+    1:         self.assertEqual(summary['total_messages'], 2)
+       
+    1:     def test_subscription(self):
+    1:         reg = self.client.post('/register', json={'username': 'bob', 'password': 'builder', 'role': 'parent'})
+    1:         user_id = reg.json()['id']
+               # Check default subscription
+    1:         sub = self.client.get(f'/subscription/{user_id}')
+    1:         self.assertEqual(sub.status_code, 200)
+    1:         self.assertEqual(sub.json()['status'], 'inactive')
+               # Activate subscription
+    1:         act = self.client.post('/subscribe', json={'user_id': user_id, 'action': 'activate'})
+    1:         self.assertEqual(act.status_code, 200)
+    1:         self.assertEqual(act.json()['status'], 'active')
+               # Cancel subscription
+    1:         cancel = self.client.post('/subscribe', json={'user_id': user_id, 'action': 'cancel'})
+    1:         self.assertEqual(cancel.status_code, 200)
+    1:         self.assertEqual(cancel.json()['status'], 'inactive')
+       
+       
+    1: if __name__ == '__main__':
+           unittest.main()

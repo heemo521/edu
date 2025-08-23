@@ -1,0 +1,100 @@
+    1: """Simple SQLite-based database utilities for AI Tutoring MVP.
+       
+       Uses Python's built-in sqlite3 module to persist user data. This avoids external
+       dependencies like SQLAlchemy, which may not be installed in the execution
+       environment. The database is initialized automatically when imported.
+       """
+       
+    1: import sqlite3
+    1: import os
+       
+       # Path to the SQLite database file
+    1: DB_FILENAME = "ai_tutoring.db"
+    1: DB_PATH = os.path.join(os.path.dirname(__file__), DB_FILENAME)
+       
+       
+    1: def init_db() -> None:
+           """Initialize the SQLite database by creating necessary tables if they do not exist.
+       
+           This function also ensures that any new columns added in future versions (e.g., xp, level,
+           streak_count, last_streak_date) exist on the users table. SQLite does not support
+           IF NOT EXISTS syntax for individual columns, so we query the table info and alter
+           the schema if required. Running this function multiple times is safe.
+           """
+    6:     conn = sqlite3.connect(DB_PATH)
+    6:     try:
+    6:         cursor = conn.cursor()
+               # Create the users table with basic columns; additional columns are added below if missing
+   12:         cursor.execute(
+    6:             """
+                   CREATE TABLE IF NOT EXISTS users (
+                       id INTEGER PRIMARY KEY AUTOINCREMENT,
+                       username TEXT UNIQUE NOT NULL,
+                       hashed_password TEXT NOT NULL,
+                       role TEXT NOT NULL
+                   )
+                   """
+               )
+               # Create table for chat messages to track progress/history
+   12:         cursor.execute(
+    6:             """
+                   CREATE TABLE IF NOT EXISTS messages (
+                       id INTEGER PRIMARY KEY AUTOINCREMENT,
+                       user_id INTEGER NOT NULL,
+                       message TEXT NOT NULL,
+                       response TEXT NOT NULL,
+                       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                       FOREIGN KEY (user_id) REFERENCES users(id)
+                   )
+                   """
+               )
+               # Create table for subscriptions
+   12:         cursor.execute(
+    6:             """
+                   CREATE TABLE IF NOT EXISTS subscriptions (
+                       id INTEGER PRIMARY KEY AUTOINCREMENT,
+                       user_id INTEGER NOT NULL,
+                       status TEXT NOT NULL DEFAULT 'inactive',
+                       start_date DATETIME,
+                       end_date DATETIME,
+                       FOREIGN KEY (user_id) REFERENCES users(id)
+                   )
+                   """
+               )
+               # Ensure progress-related columns exist in users table
+               # xp: cumulative experience points
+               # level: integer level derived from xp
+               # streak_count: number of consecutive days of activity
+               # last_streak_date: ISO date string for last activity used to compute streak
+    6:         cursor.execute("PRAGMA table_info(users)")
+   40:         existing_cols = {row[1] for row in cursor.fetchall()}
+               # Each entry is a tuple: (cid, name, type, notnull, dflt_value, pk)
+    6:         progress_columns = {
+    6:             "xp": "INTEGER DEFAULT 0",
+    6:             "level": "INTEGER DEFAULT 0",
+    6:             "streak_count": "INTEGER DEFAULT 0",
+    6:             "last_streak_date": "TEXT"
+               }
+   30:         for col_name, col_def in progress_columns.items():
+   24:             if col_name not in existing_cols:
+   20:                 cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
+    6:         conn.commit()
+           finally:
+    6:         conn.close()
+       
+       
+    1: def get_db():
+           """FastAPI dependency that yields a SQLite connection with row factory configured.
+       
+           The connection is automatically closed after the request completes.
+           """
+   47:     conn = sqlite3.connect(DB_PATH)
+   47:     conn.row_factory = sqlite3.Row
+   47:     try:
+   47:         yield conn
+           finally:
+   47:         conn.close()
+       
+       
+       # Initialize the database when this module is imported
+    1: init_db()

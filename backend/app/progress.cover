@@ -1,0 +1,109 @@
+    1: """Progress and leveling utilities for the AI Tutoring application.
+       
+       This module encapsulates logic for updating a user's experience points (XP), level and
+       daily streak. The level is derived from XP thresholds defined in XP_THRESHOLDS. A user
+       gains a configurable amount of XP per action (e.g., per chat message). The daily
+       streak increases when the user interacts with the system on consecutive days and
+       resets when a day is missed.
+       """
+       
+    1: from __future__ import annotations
+       
+    1: import sqlite3
+    1: import datetime
+    1: from typing import Tuple, Optional
+       
+       # Define XP thresholds for leveling. Index 0 corresponds to level 0, index 1 to
+       # level 1, etc. A user must accumulate at least the XP value at the next index
+       # to reach that level. For example, if XP_THRESHOLDS = [0, 100, 250, 500], a user
+       # with 120 XP has reached level 1 (>=100) but not level 2 (>=250).
+    1: XP_THRESHOLDS: list[int] = [0, 100, 250, 500, 1000, 2000]
+       
+       
+    1: def update_progress(
+           user_id: int,
+           db: sqlite3.Connection,
+    1:     xp_gain: int = 10,
+    1:     current_date: Optional[str] = None,
+       ) -> Tuple[int, int, int]:
+           """Update a user's XP, level and streak based on a new action.
+       
+           Args:
+               user_id: The ID of the user whose progress is being updated.
+               db: An open SQLite connection.
+               xp_gain: The amount of experience points to add for this action.
+               current_date: Optional ISO date string (YYYY-MM-DD) used for testing. If
+                   None, the current system date is used.
+       
+           Returns:
+               A tuple (new_xp, new_level, new_streak) reflecting the updated progress.
+       
+           The function performs the following steps:
+               1. Retrieves the user's existing XP, level, streak_count and last_streak_date.
+               2. Adds xp_gain to the XP.
+               3. Determines the new level based on XP_THRESHOLDS.
+               4. Calculates the new streak_count: if the previous streak date is yesterday,
+                  increment the streak; if it's the same day, preserve; otherwise reset to 1.
+               5. Persists the updated values back to the users table.
+           """
+   35:     cursor = db.cursor()
+   70:     cursor.execute(
+   35:         "SELECT xp, level, streak_count, last_streak_date FROM users WHERE id = ?",
+   35:         (user_id,),
+           )
+   35:     row = cursor.fetchone()
+           # Initialize defaults if user not found or columns missing
+   35:     if not row:
+               raise ValueError(f"User with id {user_id} does not exist")
+   35:     current_xp = row["xp"] if row["xp"] is not None else 0
+   35:     current_level = row["level"] if row["level"] is not None else 0
+   35:     current_streak = row["streak_count"] if row["streak_count"] is not None else 0
+   35:     last_date_str = row["last_streak_date"]
+           # Update XP
+   35:     new_xp = current_xp + xp_gain
+           # Determine new level by finding the highest threshold not exceeding new_xp
+   35:     new_level = current_level
+   37:     for idx in range(current_level + 1, len(XP_THRESHOLDS)):
+   37:         if new_xp >= XP_THRESHOLDS[idx]:
+    2:             new_level = idx
+               else:
+   35:             break
+           # Determine date for streak computation
+   35:     today_date = (
+    3:         datetime.date.fromisoformat(current_date)
+   35:         if current_date is not None
+   32:         else datetime.date.today()
+           )
+   35:     last_date = None
+   35:     if last_date_str:
+   32:         try:
+   32:             last_date = datetime.date.fromisoformat(last_date_str)
+               except ValueError:
+                   last_date = None
+           # Compute new streak: start at 1 if no previous date
+   35:     if last_date is None:
+    3:         new_streak = 1
+           else:
+   32:         delta_days = (today_date - last_date).days
+   32:         if delta_days == 0:
+                   # same day, preserve streak
+   30:             new_streak = current_streak
+    2:         elif delta_days == 1:
+                   # consecutive day, increment streak
+    1:             new_streak = current_streak + 1
+               else:
+                   # missed a day or more, reset
+    1:             new_streak = 1
+           # Persist updates
+   70:     cursor.execute(
+   35:         "UPDATE users SET xp = ?, level = ?, streak_count = ?, last_streak_date = ? WHERE id = ?",
+   35:         (
+   35:             new_xp,
+   35:             new_level,
+   35:             new_streak,
+   35:             today_date.isoformat(),
+   35:             user_id,
+               ),
+           )
+   35:     db.commit()
+   35:     return new_xp, new_level, new_streak
