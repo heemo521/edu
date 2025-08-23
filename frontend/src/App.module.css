@@ -1,0 +1,23 @@
+@import './styles/variables.css';
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.auth-page, .dashboard, .chat {
+  padding: var(--spacing);
+}
+
+.threads-tabs button.active {
+  font-weight: bold;
+}
+
+@media (min-width: 768px) {
+  .dashboard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing);
+  }
+}

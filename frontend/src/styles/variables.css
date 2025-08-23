@@ -1,0 +1,18 @@
+:root {
+  --color-bg-light: #ffffff;
+  --color-bg-dark: #1e1e1e;
+  --color-text-light: #1e1e1e;
+  --color-text-dark: #ffffff;
+  --spacing: 1rem;
+  --card-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+body.light {
+  background: var(--color-bg-light);
+  color: var(--color-text-light);
+}
+
+body.dark {
+  background: var(--color-bg-dark);
+  color: var(--color-text-dark);
+}
