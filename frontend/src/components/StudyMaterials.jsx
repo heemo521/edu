@@ -4,12 +4,14 @@ import { useAppContext } from '../context/AppContext.jsx';
 import Rating from './Rating.jsx';
 
 export default function StudyMaterials() {
-  const [subject, setSubject] = useState('math');
-  const [category, setCategory] = useState('');
+  const [subject, setSubject] = useState(() => localStorage.getItem('subject') || 'math');
+  const [category, setCategory] = useState(() => localStorage.getItem('category') || '');
   const [materials, setMaterials] = useState([]);
   const { userId } = useAppContext();
 
   useEffect(() => {
+    localStorage.setItem('subject', subject);
+    localStorage.setItem('category', category);
     fetchMaterials(subject, category).then(setMaterials).catch(console.error);
   }, [subject, category]);
 
