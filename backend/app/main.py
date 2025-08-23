@@ -100,19 +100,19 @@ def build_context(user_id: int, thread_id: int, db: sqlite3.Connection) -> str:
         # Separate older messages from the recent ones
         summary_rows = all_rows[:-MAX_CONTEXT_MESSAGES]
         recent_rows = all_rows[-MAX_CONTEXT_MESSAGES:]
-        if not summary_text:
-            # Create a naive summary by concatenating the older exchanges. In a
-            # production system, this would call an LLM to generate a concise
-            # summary instead.
-            summary_parts = [
-                f"Student: {r['message']} Tutor: {r['response']}" for r in summary_rows
-            ]
-            summary_text = " | ".join(summary_parts)
-            cursor.execute(
-                "INSERT OR REPLACE INTO summaries (user_id, thread_id, summary) VALUES (?, ?, ?)",
-                (user_id, thread_id, summary_text),
-            )
-            db.commit()
+        # Always regenerate the summary so it includes any messages beyond the
+        # most recent context window. Without this, additional messages after
+        # the first summarisation would never be captured, leaving the stored
+        # summary stale.
+        summary_parts = [
+            f"Student: {r['message']} Tutor: {r['response']}" for r in summary_rows
+        ]
+        summary_text = " | ".join(summary_parts)
+        cursor.execute(
+            "INSERT OR REPLACE INTO summaries (user_id, thread_id, summary) VALUES (?, ?, ?)",
+            (user_id, thread_id, summary_text),
+        )
+        db.commit()
     else:
         # No summary needed; ensure any existing summary is cleared
         if summary_text:
