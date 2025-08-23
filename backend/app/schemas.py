@@ -134,6 +134,9 @@ class Goal(GoalBase):
         from_attributes = True
 
 
+class GoalTemplateRequest(BaseModel):
+    """Request body for generating goals from a template."""
+    user_id: int
 # ------------------------ Feedback Schemas ------------------------
 
 class FeedbackBase(BaseModel):

@@ -37,6 +37,7 @@ class ProgressTestCase(unittest.TestCase):
         # Each chat grants default 10 XP. After 15 chats, XP should be 150.
         # According to XP_THRESHOLDS [0,100,250,...], 150 XP corresponds to level 1.
         for _ in range(15):
+            self.client.post('/chat', json={'user_id': user_id, 'thread_id': 1, 'message': 'dummy'})
             self.client.post('/chat', json={'user_id': user_id, 'thread_id': thread_id, 'message': 'dummy'})
         # Fetch dashboard to verify XP and level
         dash = self.client.get(f'/dashboard/{user_id}').json()
@@ -44,6 +45,7 @@ class ProgressTestCase(unittest.TestCase):
         self.assertEqual(dash['level'], 1)
         # A few more chats to cross the next threshold (250 XP -> level 2)
         for _ in range(15):
+            self.client.post('/chat', json={'user_id': user_id, 'thread_id': 1, 'message': 'dummy2'})
             self.client.post('/chat', json={'user_id': user_id, 'thread_id': thread_id, 'message': 'dummy2'})
         dash2 = self.client.get(f'/dashboard/{user_id}').json()
         # After 30 chats total, XP >= 300, level should be >= 2
