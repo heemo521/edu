@@ -88,6 +88,7 @@ class Thread(ThreadBase):
         from_attributes = True
 
 
+
 # ------------------------ Topic and Goal Schemas ------------------------
 
 class TopicBase(BaseModel):
@@ -127,6 +128,34 @@ class Goal(GoalBase):
     """Study goal returned in API responses."""
     id: int
     completed_sessions: int
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+# ------------------------ Plan Schemas ------------------------
+
+class PlanBase(BaseModel):
+    """Base fields for a study plan."""
+    user_id: int
+    goal_ids: list[int]
+    due_date: str | None = None
+    recurrence: str | None = None
+
+
+class PlanCreate(PlanBase):
+    """Model for creating a new study plan."""
+    pass
+
+
+class Plan(BaseModel):
+    """Study plan returned in API responses."""
+    id: int
+    user_id: int
+    goals: list[Goal]
+    due_date: str | None = None
+    recurrence: str | None = None
     created_at: str
 
     class Config:
