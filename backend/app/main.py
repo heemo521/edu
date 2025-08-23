@@ -26,6 +26,12 @@ except Exception:
     STUDY_MATERIALS = {}
 
 
+# Maximum number of recent messages to include in the context before older
+# messages are summarised and stored. Once the message count exceeds this
+# threshold, earlier exchanges are condensed into a single summary string.
+MAX_CONTEXT_MESSAGES = 5
+
+
 # ---------------------- Context Builder ----------------------
 def build_context(user_id: int, thread_id: int, db: sqlite3.Connection) -> str:
     """Construct a context string for the tutoring agent.
@@ -62,32 +68,44 @@ def build_context(user_id: int, thread_id: int, db: sqlite3.Connection) -> str:
         goals_parts.append(f"{desc} ({completed}/{target} sessions)")
     goals_text = "; ".join(goals_parts) if goals_parts else "No active goals"
 
-    # Fetch the last five messages from this thread, sorted by newest first.
+    # Fetch all messages in this thread in chronological order
     cursor.execute(
-        "SELECT message, response FROM messages WHERE user_id = ? AND thread_id = ? ORDER BY timestamp DESC LIMIT 5",
+        "SELECT message, response FROM messages WHERE user_id = ? AND thread_id = ? ORDER BY timestamp ASC",
         (user_id, thread_id),
     )
-    rows = cursor.fetchall()
-    # Determine total number of messages in this thread. This enables us to insert
-    # a summary line when older conversation exists beyond our limited context.
-    cursor.execute(
-        "SELECT COUNT(*) AS total_count FROM messages WHERE user_id = ? AND thread_id = ?",
-        (user_id, thread_id),
-    )
-    count_row = cursor.fetchone()
-    total_count = count_row["total_count"] if count_row and count_row["total_count"] is not None else 0
-    # Reverse the limited rows to chronological order so the conversation flows naturally.
-    rows = list(reversed(rows))
-    history_parts: list[str] = []
-    # If there are more messages than we've fetched, include a note about omitted
-    # messages. We can't summarise them automatically yet, but this warns the
-    # tutor (and the user) that earlier context exists.
-    if total_count > len(rows) and len(rows) > 0:
-        omitted = total_count - len(rows)
-        history_parts.append(
-            f"(Earlier conversation has {omitted} additional messages; older messages have been summarized.)"
+    all_rows = cursor.fetchall()
+    total_count = len(all_rows)
+
+    summary_text = ""
+    recent_rows = all_rows
+    if total_count > MAX_CONTEXT_MESSAGES:
+        # Separate older messages from the recent ones
+        summary_rows = all_rows[:-MAX_CONTEXT_MESSAGES]
+        recent_rows = all_rows[-MAX_CONTEXT_MESSAGES:]
+        # Create a naive summary by concatenating the older exchanges. In a
+        # production system, this would call an LLM to generate a concise
+        # summary instead.
+        summary_parts = [
+            f"Student: {r['message']} Tutor: {r['response']}" for r in summary_rows
+        ]
+        summary_text = " | ".join(summary_parts)
+        cursor.execute(
+            "INSERT OR REPLACE INTO summaries (user_id, thread_id, summary) VALUES (?, ?, ?)",
+            (user_id, thread_id, summary_text),
         )
-    for row in rows:
+        db.commit()
+    else:
+        # No summary needed; ensure any existing summary is cleared
+        cursor.execute(
+            "DELETE FROM summaries WHERE user_id = ? AND thread_id = ?",
+            (user_id, thread_id),
+        )
+        db.commit()
+
+    history_parts: list[str] = []
+    if summary_text:
+        history_parts.append(f"Summary: {summary_text}")
+    for row in recent_rows:
         msg = row["message"]
         resp = row["response"]
         history_parts.append(f"Student: {msg}\nTutor: {resp}")
@@ -525,6 +543,48 @@ def complete_goal(goal_id: int, db: sqlite3.Connection = Depends(database.get_db
         created_at=row["created_at"],
         due_date=row["due_date"],
     )
+
+
+# ---------------------- Summary Endpoints ----------------------
+
+@app.get("/summaries/{user_id}/{thread_id}", response_model=schemas.Summary)
+def get_summary(user_id: int, thread_id: int, db: sqlite3.Connection = Depends(database.get_db)):
+    """Retrieve the stored summary for a user's thread."""
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT summary FROM summaries WHERE user_id = ? AND thread_id = ?",
+        (user_id, thread_id),
+    )
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Summary not found")
+    return schemas.Summary(user_id=user_id, thread_id=thread_id, summary=row["summary"])
+
+
+@app.post("/summaries", response_model=schemas.Summary, status_code=status.HTTP_201_CREATED)
+def create_summary(summary: schemas.Summary, db: sqlite3.Connection = Depends(database.get_db)):
+    """Create or overwrite a summary for the specified thread."""
+    cursor = db.cursor()
+    cursor.execute(
+        "INSERT OR REPLACE INTO summaries (user_id, thread_id, summary) VALUES (?, ?, ?)",
+        (summary.user_id, summary.thread_id, summary.summary),
+    )
+    db.commit()
+    return summary
+
+
+@app.put("/summaries", response_model=schemas.Summary)
+def update_summary(summary: schemas.Summary, db: sqlite3.Connection = Depends(database.get_db)):
+    """Update an existing summary for a user's thread."""
+    cursor = db.cursor()
+    cursor.execute(
+        "UPDATE summaries SET summary = ? WHERE user_id = ? AND thread_id = ?",
+        (summary.summary, summary.user_id, summary.thread_id),
+    )
+    if cursor.rowcount == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Summary not found")
+    db.commit()
+    return summary
 
 
 # ---------------------- Thread Endpoints ----------------------

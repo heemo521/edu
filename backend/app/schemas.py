@@ -131,3 +131,10 @@ class Goal(GoalBase):
 
     class Config:
         from_attributes = True
+
+
+class Summary(BaseModel):
+    """Summarised text for a user's conversation thread."""
+    user_id: int
+    thread_id: int
+    summary: str

@@ -64,6 +64,23 @@ def init_db() -> None:
             )
             """
         )
+
+        # Summaries table stores condensed representations of long conversation
+        # threads.  Each entry is uniquely identified by the owning user and
+        # thread.  The summary text may be regenerated over time as more
+        # messages are added.
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS summaries (
+                user_id INTEGER NOT NULL,
+                thread_id INTEGER NOT NULL,
+                summary TEXT,
+                PRIMARY KEY (user_id, thread_id),
+                FOREIGN KEY (user_id) REFERENCES users(id),
+                FOREIGN KEY (thread_id) REFERENCES threads(id)
+            )
+            """
+        )
         # Create table for subscriptions
         cursor.execute(
             """
