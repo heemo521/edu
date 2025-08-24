@@ -1,0 +1,17 @@
+.page-tabs {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 1px solid #ccc;
+  margin-bottom: 1rem;
+}
+
+.page-tabs a {
+  padding: 0.5rem 1rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.page-tabs a.active {
+  border-bottom: 2px solid currentColor;
+  font-weight: bold;
+}
