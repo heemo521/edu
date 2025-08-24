@@ -11,14 +11,27 @@ export default function Chat() {
 
   useEffect(() => {
     if (userId && currentThreadId) {
-      fetchHistory(userId, currentThreadId).then(setMessages).catch(console.error);
+      fetchHistory(userId, currentThreadId)
+        .then((history) => {
+          // History items come back as pairs of user message and bot response.
+          // Flatten them into the shape used by the chat UI.
+          const formatted = history.flatMap((h) => [
+            { sender: 'user', text: h.message },
+            { sender: 'bot', text: h.response },
+          ]);
+          setMessages(formatted);
+        })
+        .catch(console.error);
     }
   }, [userId, currentThreadId]);
 
   const send = async () => {
     if (!input) return;
     const res = await sendChatMessage(userId, currentThreadId, input);
-    setMessages((m) => [...m, { sender: 'user', text: input }, { sender: 'bot', text: res.reply }]);
+    // The backend returns the tutor reply under the `response` key. Fall back to
+    // `reply` for backward compatibility in tests/mocks.
+    const reply = res.response ?? res.reply ?? '';
+    setMessages((m) => [...m, { sender: 'user', text: input }, { sender: 'bot', text: reply }]);
     setInput('');
     setXp(xp + 1);
   };

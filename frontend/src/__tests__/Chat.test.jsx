@@ -16,7 +16,7 @@ function setup() {
 
 describe('Chat', () => {
   it('sends message and renders reply', async () => {
-    api.sendChatMessage.mockResolvedValue({ reply: 'hello back' });
+    api.sendChatMessage.mockResolvedValue({ response: 'hello back' });
     api.fetchHistory.mockResolvedValue([]);
     setup();
     const input = screen.getByRole('textbox');
